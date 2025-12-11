@@ -1,0 +1,28 @@
+platform :ios, '14.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Release' => :release,
+  'Profile' => :release,
+}
+
+def flutter_root
+  File.expand_path(File.join('..', '..'))
+end
+
+load File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper.rb')
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  # Needed for Flutter 3.24+
+  use_frameworks! :linkage => :static
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+post_install do |installer|
+  flutter_post_install(installer)
+end
