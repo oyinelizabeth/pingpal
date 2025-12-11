@@ -3,12 +3,12 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
-// correct pages
 import 'profile.dart';
 import 'friends.dart';
 import 'chats.dart';  // ChatPage (conversation)
 import 'inbox.dart'; // ChatsPage (inbox list)
 import 'map.dart';
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,6 +20,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int navIndex = 0;
 
+  // temporary demo data for friends list
+  // NEED TO REPLACE WITH LIVE DATA FROM BACKEND
+  
   final List<Map<String, dynamic>> friends = [
     {
       "name": "Emma Wilson",
@@ -38,39 +41,54 @@ class _HomePageState extends State<HomePage> {
     },
   ];
 
+  /// Pull-to-refresh handler (currently a placeholder)
+  /// This will later call backend APIs to refresh live data.
   Future<void> _onRefresh() async {
     await Future.delayed(const Duration(milliseconds: 800));
   }
 
-  // NAVIGATION HANDLERS ------------------------
+  // -------------------- NAVIGATION HANDLERS --------------------
 
+  // navigates to the user's profile page
   void _openProfile() {
-    Navigator.push(context,
-      MaterialPageRoute(builder: (_) => const ProfilePage()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ProfilePage()),
+    );
   }
 
+  // navigate to the friends list page
   void _openFriends() {
-    Navigator.push(context,
-      MaterialPageRoute(builder: (_) => FriendsPage(friends: friends)));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => FriendsPage(friends: friends)),
+    );
   }
 
+  // navigate to chats inbox
   void _openChats() {
-    Navigator.push(context,
-      MaterialPageRoute(builder: (_) => const ChatsPage())); // inbox
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ChatsPage()),
+    );
   }
 
+  // navigate to full interactive map screen
   void _openMap() {
-    Navigator.push(context,
-      MaterialPageRoute(builder: (_) => const MapPage()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MapPage()),
+    );
   }
 
-  // --------------------------------------------
+  // --------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
 
+      // ------------------------ APP BAR -------------------------
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -82,6 +100,8 @@ class _HomePageState extends State<HomePage> {
             fontWeight: FontWeight.w600,
           ),
         ),
+
+        // profile picture in the top right, acts as a shortcut to ProfilePage/settings
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -98,8 +118,10 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
+      // ------------------------ MAIN BODY ------------------------
       body: RefreshIndicator(
-        onRefresh: _onRefresh,
+        // pull-to-refresh functionality
+        onRefresh: _onRefresh, 
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -107,7 +129,8 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // MAP SECTION -------------------------
+              // ------------------------ MAP PREVIEW ------------------------
+              // GoogleMap widget shown on the home screen.
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: SizedBox(
@@ -115,7 +138,7 @@ class _HomePageState extends State<HomePage> {
                   width: double.infinity,
                   child: GoogleMap(
                     initialCameraPosition: const CameraPosition(
-                      target: LatLng(51.5074, -0.1278),
+                      target: LatLng(51.5074, -0.1278), // London default
                       zoom: 12,
                     ),
                     myLocationButtonEnabled: false,
@@ -126,7 +149,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 25),
 
-              // FRIENDS SECTION ---------------------
+              // ------------------------ FRIENDS SECTION ---------------------
               const Text(
                 "Friends",
                 style: TextStyle(
@@ -137,6 +160,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 12),
 
+              // shows a summary of friends and their status and takes the user to the full friends list page.
               GestureDetector(
                 onTap: _openFriends,
                 child: Container(
@@ -155,6 +179,7 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Row(
                             children: [
+                              // friend's profile picture
                               Container(
                                 width: 55,
                                 height: 55,
@@ -168,6 +193,7 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const SizedBox(width: 14),
 
+                              // friend's name and online status
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -192,11 +218,17 @@ class _HomePageState extends State<HomePage> {
                               ),
 
                               const Spacer(),
-                              const Icon(Icons.arrow_forward_ios,
-                                  size: 18, color: AppTheme.primaryPink),
+
+                              // arrow icon indicating tap behaviour
+                              const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 18,
+                                color: AppTheme.primaryPink,
+                              ),
                             ],
                           ),
 
+                          // divider between each friend tile
                           if (!isLast)
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 12),
@@ -215,7 +247,7 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 30),
 
-              // FEATURES GRID -----------------------
+              // ------------------------ FEATURES GRID -----------------------
               const Text(
                 "Features",
                 style: TextStyle(
@@ -226,6 +258,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 12),
 
+              // shortcuts to features.
               GridView.count(
                 crossAxisCount: 3,
                 shrinkWrap: true,
@@ -236,11 +269,9 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   _featureTile(Icons.chat_bubble_outline, "Chats", _openChats),
                   _featureTile(Icons.share_location, "Share", _openMap),
-                  _featureTile(Icons.warning_amber_rounded,
-                      "Emergency", () {}),
+                  _featureTile(Icons.warning_amber_rounded, "Emergency", () {}),
                   _featureTile(Icons.map_outlined, "Map", _openMap),
-                  _featureTile(Icons.people_alt_outlined,
-                      "Friends", _openFriends),
+                  _featureTile(Icons.people_alt_outlined, "Friends", _openFriends),
                   _featureTile(Icons.settings_outlined, "Settings", () {}),
                 ],
               ),
@@ -251,12 +282,13 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
 
-      // NAVBAR HANDLING --------------------------
+      // ------------------------ BOTTOM NAVIGATION ------------------------
       bottomNavigationBar: NavBar(
         currentIndex: navIndex,
         onTap: (i) {
           setState(() => navIndex = i);
 
+          // each button is linked to a different page.
           if (i == 1) _openMap();
           if (i == 2) _openChats();
           if (i == 3) _openFriends();
@@ -266,7 +298,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Tile UI builder
+  // ------------------------ FEATURE TILE BUILDER ------------------------
+  // feature grid
   Widget _featureTile(IconData icon, String label, VoidCallback onTap) {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
