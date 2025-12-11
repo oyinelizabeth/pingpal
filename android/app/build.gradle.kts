@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.pingpal"
-    compileSdk = 35
+    compileSdk = 36
 
     // Required for Firebase, Maps, Geolocator
     ndkVersion = "27.0.12077973"
@@ -21,11 +21,10 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.pingpal"
 
-        // REQUIRED by Firebase Auth / Firestore
-        minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        applicationId = "com.example.pingpal"
+        minSdk = 23
+        targetSdk = 36
 
         versionCode = 1
         versionName = "1.0"
