@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
+import 'pingtrail_complete.dart';
 import 'dart:async';
 
 class SelectDestinationPage extends StatefulWidget {
@@ -70,6 +71,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
 
   void _startPingtrail() {
     // TODO: Start pingtrail and send invites to selected friends
+    // For demo purposes, show completion screen after a delay
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -93,6 +95,57 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
             },
             child: const Text(
               'Done',
+              style: TextStyle(color: AppTheme.primaryBlue),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Navigate to completion screen (for demo)
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => PingtrailCompletePage(
+                    trailName: widget.trailName,
+                    destination: selectedDestination["name"],
+                    duration: '45m 12s',
+                    distance: '3.2 km',
+                    participants: [
+                      {
+                        "name": "You",
+                        "avatar": "https://i.pravatar.cc/150?img=8",
+                        "arrivalTime": "20:12",
+                        "timeDiff": "+0m",
+                        "isHost": true,
+                        "arrived": true,
+                      },
+                      {
+                        "name": "Sarah",
+                        "avatar": "https://i.pravatar.cc/150?img=3",
+                        "arrivalTime": "20:15",
+                        "timeDiff": "+3m",
+                        "arrived": true,
+                      },
+                      {
+                        "name": "Mike",
+                        "avatar": "https://i.pravatar.cc/150?img=2",
+                        "arrivalTime": "20:18",
+                        "timeDiff": "+6m",
+                        "arrived": true,
+                      },
+                      {
+                        "name": "Jessica",
+                        "avatar": "https://i.pravatar.cc/150?img=1",
+                        "arrivalTime": "20:25",
+                        "timeDiff": "+13m",
+                        "arrived": true,
+                      },
+                    ],
+                  ),
+                ),
+              );
+            },
+            child: const Text(
+              'View Summary',
               style: TextStyle(color: AppTheme.primaryBlue),
             ),
           ),
