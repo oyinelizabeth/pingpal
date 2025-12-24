@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
 import '../pages/settings.dart';
 import '../pages/chat_list.dart';
+import '../pages/pingpals.dart';
 
 class NavBar extends StatelessWidget {
   final int currentIndex;
@@ -44,12 +45,19 @@ class NavBar extends StatelessWidget {
                   index: 0,
                 ),
               ),
-              // Requests
+              // Pingpals
               GestureDetector(
-                onTap: () => onTap(1),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PingpalsPage(),
+                    ),
+                  );
+                },
                 child: _buildNavItem(
-                  icon: FontAwesomeIcons.userPlus,
-                  label: 'Requests',
+                  icon: FontAwesomeIcons.users,
+                  label: 'Pingpals',
                   index: 1,
                 ),
               ),
