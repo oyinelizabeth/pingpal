@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
+import 'create_pingtrail.dart';
 
 class PingtrailPage extends StatefulWidget {
   const PingtrailPage({super.key});
@@ -104,7 +105,12 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   ),
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      // TODO: Navigate to create pingtrail
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CreatePingtrailPage(),
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
