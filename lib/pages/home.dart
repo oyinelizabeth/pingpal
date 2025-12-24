@@ -8,6 +8,7 @@ import 'profile.dart';
 import 'inbox.dart'; // ChatsPage (inbox list)
 import 'pingtrail.dart';
 import 'requests.dart';
+import 'notifications.dart';
 
 
 class HomePage extends StatefulWidget {
@@ -57,7 +58,10 @@ class _HomePageState extends State<HomePage> {
 
   // navigate to notifications
   void _openNotifications() {
-    // TODO: Navigate to notifications page
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsPage()),
+    );
     setState(() {
       hasNotifications = false; // Clear badge after viewing
     });
@@ -176,7 +180,7 @@ class _HomePageState extends State<HomePage> {
                               width: 10,
                               height: 10,
                               decoration: const BoxDecoration(
-                                color: Colors.red,
+                                color: AppTheme.primaryBlue,
                                 shape: BoxShape.circle,
                               ),
                             ),
