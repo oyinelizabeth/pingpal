@@ -79,7 +79,7 @@ class NavBar extends StatelessWidget {
                   index: 3,
                 ),
               ),
-              // Settings
+              // Settings (Note: Settings page doesn't have navbar, so index doesn't matter)
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -172,7 +172,7 @@ class NavBar extends StatelessWidget {
         ),
         child: Center(
           child: FaIcon(
-            FontAwesomeIcons.map,
+            FontAwesomeIcons.mapLocationDot,
             size: 24,
             color: isActive ? Colors.white : AppTheme.textGray,
           ),

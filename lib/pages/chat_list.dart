@@ -3,6 +3,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'chats.dart';
+import 'pingtrail.dart';
+import 'pingpals.dart';
 
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
@@ -12,7 +14,7 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
-  int _navIndex = 3; // Chat is at index 3
+  int _navIndex = 3; // Chat is at index 3 (correct)
 
   // Sample active trail chat
   final Map<String, dynamic>? activeTrail = {
@@ -155,8 +157,23 @@ class _ChatListPageState extends State<ChatListPage> {
       bottomNavigationBar: NavBar(
         currentIndex: _navIndex,
         onTap: (index) {
-          if (index != _navIndex) {
+          if (index == _navIndex) return; // Already on this page
+
+          if (index == 2) {
+            // Navigate to home/map
             Navigator.pop(context);
+          } else if (index == 0) {
+            // Navigate to Pingtrail
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => PingtrailPage()),
+            );
+          } else if (index == 1) {
+            // Navigate to Pingpals
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => PingpalsPage()),
+            );
           }
         },
       ),
