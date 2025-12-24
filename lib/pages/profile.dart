@@ -24,7 +24,7 @@ class ProfilePage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textBlack,
+                color: AppTheme.textGray,
               ),
             ),
             const SizedBox(height: 24),
@@ -38,7 +38,7 @@ class ProfilePage extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryPink,
+                  backgroundColor: AppTheme.cardBackground,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -62,17 +62,17 @@ class ProfilePage extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.softPink, width: 1.5),
+        border: Border.all(color: AppTheme.textGray, width: 1.5),
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.primaryPink),
+          Icon(icon, color: AppTheme.primaryBlue),
           const SizedBox(width: 12),
           Text(
             label,
             style: const TextStyle(
               fontWeight: FontWeight.w600,
-              color: AppTheme.textBlack,
+              color: AppTheme.textGray,
             ),
           ),
           const Spacer(),

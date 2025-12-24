@@ -18,7 +18,7 @@ class AuthHeader extends StatelessWidget {
           width: 56,
           height: 56,
           decoration: const BoxDecoration(
-            color: AppTheme.primaryPink,
+            color: AppTheme.cardBackground,
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.place, color: Colors.white),
@@ -31,7 +31,7 @@ class AuthHeader extends StatelessWidget {
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w700,
-            color: AppTheme.textBlack,
+            color: AppTheme.textGray,
             letterSpacing: 0.2,
           ),
         ),
@@ -53,7 +53,7 @@ class AuthHeader extends StatelessWidget {
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textBlack,
+            color: AppTheme.textGray,
           ),
         ),
       ],

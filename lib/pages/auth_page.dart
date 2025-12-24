@@ -7,7 +7,9 @@ import '../widgets/password_text_field.dart';
 import 'home.dart';
 
 class AuthPage extends StatefulWidget {
-  const AuthPage({super.key});
+  final int initialTab;
+
+  const AuthPage({super.key, this.initialTab = 0});
 
   @override
   State<AuthPage> createState() => _AuthPageState();
@@ -19,7 +21,11 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    );
   }
 
   @override
@@ -31,41 +37,46 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primaryPink.withOpacity(0.05),
-              AppTheme.softPink.withOpacity(0.1),
-              Colors.white,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              // App Logo and Brand
-              _buildHeader(),
-              const SizedBox(height: 32),
-              // Tab Bar
-              _buildTabBar(),
-              const SizedBox(height: 24),
-              // Tab View
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildLoginForm(),
-                    _buildSignUpForm(),
-                  ],
-                ),
+      backgroundColor: AppTheme.darkBackground,
+      body: Stack(
+        children: [
+          // World map background
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.05,
+              child: Image.asset(
+                'assets/images/world_map.png',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(); // Fallback if image not found
+                },
               ),
-            ],
+            ),
           ),
-        ),
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                // App Logo and Brand
+                _buildHeader(),
+                const SizedBox(height: 32),
+                // Tab Bar
+                _buildTabBar(),
+                const SizedBox(height: 24),
+                // Tab View
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildLoginForm(),
+                      _buildSignUpForm(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -81,15 +92,15 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppTheme.primaryPink,
-                AppTheme.accentPurple,
+                AppTheme.primaryBlue,
+                AppTheme.accentBlue,
               ],
             ),
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primaryPink.withOpacity(0.3),
-                blurRadius: 20,
+                color: AppTheme.primaryBlue.withOpacity(0.4),
+                blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
             ],
@@ -102,17 +113,17 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
         ),
         const SizedBox(height: 16),
         const Text(
-          'PingPal',
+          'Pingpal',
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w700,
-            color: AppTheme.textBlack,
+            color: AppTheme.textWhite,
             letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          'Stay connected, anywhere, anytime',
+        const Text(
+          'Stay connected, anywhere.',
           style: TextStyle(
             fontSize: 14,
             color: AppTheme.textGray,
@@ -127,23 +138,18 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(50),
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.borderColor,
+          width: 1,
+        ),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppTheme.primaryPink, AppTheme.accentPurple],
-          ),
-          borderRadius: BorderRadius.circular(50),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryPink.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppTheme.primaryBlue,
+          borderRadius: BorderRadius.circular(10),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
@@ -157,8 +163,9 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
+        padding: const EdgeInsets.all(4),
         tabs: const [
-          Tab(text: 'Login'),
+          Tab(text: 'Log In'),
           Tab(text: 'Sign Up'),
         ],
       ),
@@ -174,24 +181,16 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 8),
-          const Text(
-            'Welcome back!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textBlack,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Log in to continue your journey',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.textGray,
-            ),
-          ),
           const SizedBox(height: 32),
+          const Text(
+            'Email Address',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textWhite,
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Email Field
           CustomTextField(
@@ -216,7 +215,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             child: TextButton(
               onPressed: () {},
               style: TextButton.styleFrom(
-                foregroundColor: AppTheme.primaryPink,
+                foregroundColor: AppTheme.primaryBlue,
               ),
               child: const Text(
                 'Forgot password?',
@@ -238,23 +237,23 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             },
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
           // Divider with OR
           Row(
             children: [
-              const Expanded(child: Divider()),
+              const Expanded(child: Divider(color: AppTheme.dividerColor)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'or continue with',
+                child: const Text(
+                  'Or continue with',
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: AppTheme.textGray,
                     fontSize: 13,
                   ),
                 ),
               ),
-              const Expanded(child: Divider()),
+              const Expanded(child: Divider(color: AppTheme.dividerColor)),
             ],
           ),
 
@@ -265,16 +264,16 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             children: [
               Expanded(
                 child: _buildSocialButton(
-                  icon: FontAwesomeIcons.google,
-                  label: 'Google',
+                  icon: FontAwesomeIcons.apple,
+                  label: 'Apple',
                   onPressed: () {},
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildSocialButton(
-                  icon: FontAwesomeIcons.apple,
-                  label: 'Apple',
+                  icon: FontAwesomeIcons.google,
+                  label: 'Google',
                   onPressed: () {},
                 ),
               ),
@@ -304,7 +303,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textBlack,
+              color: AppTheme.textGray,
             ),
           ),
           const SizedBox(height: 8),
@@ -425,8 +424,9 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       label: Text(label),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
-        side: BorderSide(color: Colors.grey.shade300),
-        foregroundColor: AppTheme.textBlack,
+        side: const BorderSide(color: AppTheme.borderColor, width: 1.5),
+        foregroundColor: AppTheme.textWhite,
+        backgroundColor: AppTheme.cardBackground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

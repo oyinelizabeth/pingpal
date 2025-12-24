@@ -22,7 +22,7 @@ class FriendsPage extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.softPink, width: 1.7),
+              border: Border.all(color: AppTheme.cardBackground, width: 1.7),
             ),
             child: Row(
               children: [
@@ -46,7 +46,7 @@ class FriendsPage extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textBlack,
+                        color: AppTheme.textGray,
                       ),
                     ),
                     Text(
@@ -64,7 +64,7 @@ class FriendsPage extends StatelessWidget {
                     // later: open chat with this friend
                   },
                   icon: const Icon(Icons.chat_bubble_outline,
-                      color: AppTheme.primaryPink),
+                      color: AppTheme.primaryBlue),
                 ),
               ],
             ),

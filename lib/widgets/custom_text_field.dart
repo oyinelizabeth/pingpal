@@ -34,29 +34,26 @@ class CustomTextField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hintText,
         suffixIcon: suffixIcon != null
-            ? Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: FaIcon(
-                  suffixIcon,
-                  size: 18,
-                  color: AppTheme.textGray.withOpacity(0.6),
-                ),
+            ? Icon(
+                suffixIcon,
+                size: 18,
+                color: AppTheme.textGray.withOpacity(0.6),
               )
             : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: const BorderSide(color: AppTheme.borderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: const BorderSide(color: AppTheme.borderColor),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppTheme.primaryPink, width: 2),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: AppTheme.primaryBlue, width: 2),
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppTheme.inputBackground,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,

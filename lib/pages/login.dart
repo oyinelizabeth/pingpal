@@ -68,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
                       child: TextButton(
                         onPressed: () {},
                         style: TextButton.styleFrom(
-                          foregroundColor: AppTheme.primaryPink,
+                          foregroundColor: AppTheme.primaryBlue,
                         ),
                         child: const Text('Forgot password?'),
                       ),
@@ -118,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           side: BorderSide(color: Colors.grey.shade300),
-                          foregroundColor: AppTheme.textBlack,
+                          foregroundColor: AppTheme.textGray,
                         ),
                         onPressed: () {},
                       ),
@@ -143,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
                             );
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.primaryPink,
+                            foregroundColor: AppTheme.primaryBlue,
                           ),
                           child: const Text('Create one'),
                         )

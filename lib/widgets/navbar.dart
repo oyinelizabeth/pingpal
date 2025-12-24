@@ -14,14 +14,14 @@ class NavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, -2),
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
           )
         ],
       ),
@@ -30,8 +30,8 @@ class NavBar extends StatelessWidget {
         onTap: onTap,
         elevation: 0,
         backgroundColor: Colors.transparent,
-        selectedItemColor: AppTheme.primaryPink,
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: AppTheme.primaryBlue,
+        unselectedItemColor: AppTheme.textGray,
         showSelectedLabels: false,
         showUnselectedLabels: false,
         type: BottomNavigationBarType.fixed,
@@ -55,7 +55,7 @@ class NavBar extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.all(isActive ? 8 : 4),
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.softPink.withOpacity(0.6) : Colors.transparent,
+          color: isActive ? AppTheme.primaryBlue.withOpacity(0.2) : Colors.transparent,
           shape: BoxShape.circle,
         ),
         child: Icon(
