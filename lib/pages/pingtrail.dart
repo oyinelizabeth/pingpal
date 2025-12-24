@@ -4,6 +4,8 @@ import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'create_pingtrail.dart';
 import 'pingtrails_history.dart';
+import 'pingpals.dart';
+import 'chat_list.dart';
 
 class PingtrailPage extends StatefulWidget {
   const PingtrailPage({super.key});
@@ -13,7 +15,7 @@ class PingtrailPage extends StatefulWidget {
 }
 
 class _PingtrailPageState extends State<PingtrailPage> {
-  int _navIndex = 0; // Pingtrail is at index 0
+  int _navIndex = 0; // Pingtrail is at index 0 (correct)
 
   // Sample data for active pingtrail
   final Map<String, dynamic>? activePingtrail = {
@@ -272,8 +274,23 @@ class _PingtrailPageState extends State<PingtrailPage> {
       bottomNavigationBar: NavBar(
         currentIndex: _navIndex,
         onTap: (index) {
-          if (index != _navIndex) {
+          if (index == _navIndex) return; // Already on this page
+
+          if (index == 2) {
+            // Navigate to home/map
             Navigator.pop(context);
+          } else if (index == 1) {
+            // Navigate to Pingpals
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => PingpalsPage()),
+            );
+          } else if (index == 3) {
+            // Navigate to Chat
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => ChatListPage()),
+            );
           }
         },
       ),

@@ -7,7 +7,8 @@ import '../widgets/navbar.dart';
 import 'profile.dart';
 import 'inbox.dart'; // ChatsPage (inbox list)
 import 'pingtrail.dart';
-import 'requests.dart';
+import 'pingpals.dart';
+import 'chat_list.dart';
 import 'notifications.dart';
 
 
@@ -28,7 +29,7 @@ class _HomePageState extends State<HomePage> {
   void _openPingtrail() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const PingtrailPage()),
+      MaterialPageRoute(builder: (_) => PingtrailPage()),
     );
   }
 
@@ -36,7 +37,7 @@ class _HomePageState extends State<HomePage> {
   void _openRequests() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const RequestsPage()),
+      MaterialPageRoute(builder: (_) => PingpalsPage()),
     );
   }
 
@@ -44,7 +45,7 @@ class _HomePageState extends State<HomePage> {
   void _openChats() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ChatsPage()),
+      MaterialPageRoute(builder: (_) => ChatsPage()),
     );
   }
 
@@ -234,7 +235,7 @@ class _HomePageState extends State<HomePage> {
 
       // ------------------------ BOTTOM NAVIGATION ------------------------
       bottomNavigationBar: NavBar(
-        currentIndex: navIndex,
+        currentIndex: 2, // Always highlight center map icon on home page
         onTap: (i) {
           setState(() => navIndex = i);
 
