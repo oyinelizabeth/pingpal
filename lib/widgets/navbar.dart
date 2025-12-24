@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
+import '../pages/settings.dart';
 
 class NavBar extends StatelessWidget {
   final int currentIndex;
@@ -34,30 +35,49 @@ class NavBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Pingtrail
-              _buildNavItem(
-                icon: FontAwesomeIcons.route,
-                label: 'Pingtrail',
-                index: 0,
+              GestureDetector(
+                onTap: () => onTap(0),
+                child: _buildNavItem(
+                  icon: FontAwesomeIcons.route,
+                  label: 'Pingtrail',
+                  index: 0,
+                ),
               ),
               // Requests
-              _buildNavItem(
-                icon: FontAwesomeIcons.userPlus,
-                label: 'Requests',
-                index: 1,
+              GestureDetector(
+                onTap: () => onTap(1),
+                child: _buildNavItem(
+                  icon: FontAwesomeIcons.userPlus,
+                  label: 'Requests',
+                  index: 1,
+                ),
               ),
               // Map (Center, Larger)
               _buildCenterMapButton(),
               // Chat
-              _buildNavItem(
-                icon: FontAwesomeIcons.message,
-                label: 'Chat',
-                index: 3,
+              GestureDetector(
+                onTap: () => onTap(3),
+                child: _buildNavItem(
+                  icon: FontAwesomeIcons.message,
+                  label: 'Chat',
+                  index: 3,
+                ),
               ),
               // Settings
-              _buildNavItem(
-                icon: FontAwesomeIcons.gear,
-                label: 'Settings',
-                index: 4,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SettingsPage(),
+                    ),
+                  );
+                },
+                child: _buildNavItem(
+                  icon: FontAwesomeIcons.gear,
+                  label: 'Settings',
+                  index: 4,
+                ),
               ),
             ],
           ),
@@ -73,9 +93,7 @@ class NavBar extends StatelessWidget {
   }) {
     final bool isActive = currentIndex == index;
 
-    return GestureDetector(
-      onTap: () => onTap(index),
-      child: Column(
+    return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           AnimatedContainer(
@@ -103,8 +121,7 @@ class NavBar extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildCenterMapButton() {
