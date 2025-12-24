@@ -192,7 +192,7 @@ class _HomePageState extends State<HomePage> {
           // ------------------------ FLOATING ACTION BUTTONS ------------------------
           // Recenter/My Location Button
           Positioned(
-            bottom: 120,
+            bottom: 104,
             right: 16,
             child: FloatingActionButton(
               heroTag: 'recenter',
@@ -210,7 +210,7 @@ class _HomePageState extends State<HomePage> {
 
           // Map Layers Button
           Positioned(
-            bottom: 190,
+            bottom: 174,
             right: 16,
             child: FloatingActionButton(
               heroTag: 'layers',
