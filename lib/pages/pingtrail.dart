@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'create_pingtrail.dart';
+import 'pingtrails_history.dart';
 
 class PingtrailPage extends StatefulWidget {
   const PingtrailPage({super.key});
@@ -213,7 +214,12 @@ class _PingtrailPageState extends State<PingtrailPage> {
                 // View Full History Button
                 InkWell(
                   onTap: () {
-                    // TODO: Navigate to full history
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PingtrailsHistoryPage(),
+                      ),
+                    );
                   },
                   child: Container(
                     width: double.infinity,
