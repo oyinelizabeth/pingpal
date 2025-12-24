@@ -15,7 +15,6 @@ class NavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 80,
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -30,7 +29,7 @@ class NavBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
