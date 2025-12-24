@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
 import '../pages/settings.dart';
+import '../pages/chat_list.dart';
 
 class NavBar extends StatelessWidget {
   final int currentIndex;
@@ -56,7 +57,14 @@ class NavBar extends StatelessWidget {
               _buildCenterMapButton(),
               // Chat
               GestureDetector(
-                onTap: () => onTap(3),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChatListPage(),
+                    ),
+                  );
+                },
                 child: _buildNavItem(
                   icon: FontAwesomeIcons.message,
                   label: 'Chat',
