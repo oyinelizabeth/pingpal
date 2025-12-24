@@ -64,9 +64,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     // Profile Section
                     Stack(
                       children: [
-                        CircleAvatar(
+                        const CircleAvatar(
                           radius: 50,
-                          backgroundImage: const NetworkImage(
+                          backgroundImage: NetworkImage(
                             'https://i.pravatar.cc/300?img=12',
                           ),
                         ),

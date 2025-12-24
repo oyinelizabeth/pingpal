@@ -14,7 +14,7 @@ class PingtrailsHistoryPage extends StatefulWidget {
 class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _navIndex = 0;
+  final int _navIndex = 0;
   final TextEditingController _searchController = TextEditingController();
 
   // Sample completed pingtrails data
@@ -113,7 +113,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
           destination: trail["destination"],
           duration: trail["duration"],
           distance: '3.2 km',
-          participants: [
+          participants: const [
             {
               "name": "You",
               "avatar": "https://i.pravatar.cc/150?img=8",
@@ -197,7 +197,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
                       color: AppTheme.textGray.withOpacity(0.6),
                       fontSize: 14,
                     ),
-                    prefixIcon: Icon(
+                    prefixIcon: const Icon(
                       FontAwesomeIcons.magnifyingGlass,
                       color: AppTheme.primaryBlue,
                       size: 18,

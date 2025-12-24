@@ -12,7 +12,7 @@ class CreatePingtrailPage extends StatefulWidget {
 }
 
 class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
-  int _navIndex = 0; // Pingtrail is at index 0
+  final int _navIndex = 0; // Pingtrail is at index 0
   final TextEditingController _trailNameController = TextEditingController(
     text: 'Friday Night Out',
   );
@@ -148,7 +148,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Trail Name Label
-                    Text(
+                    const Text(
                       'TRAIL NAME',
                       style: TextStyle(
                         fontSize: 12,
@@ -281,7 +281,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                     const SizedBox(height: 24),
 
                     // Suggested Section
-                    Text(
+                    const Text(
                       'SUGGESTED',
                       style: TextStyle(
                         fontSize: 12,
@@ -301,7 +301,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                     const SizedBox(height: 24),
 
                     // All Pingpals Section
-                    Text(
+                    const Text(
                       'ALL PINGPALS',
                       style: TextStyle(
                         fontSize: 12,
@@ -363,9 +363,9 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                   borderRadius: BorderRadius.circular(30),
                 ),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,

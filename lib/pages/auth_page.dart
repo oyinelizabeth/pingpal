@@ -240,12 +240,12 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           const SizedBox(height: 32),
 
           // Divider with OR
-          Row(
+          const Row(
             children: [
-              const Expanded(child: Divider(color: AppTheme.dividerColor)),
+              Expanded(child: Divider(color: AppTheme.dividerColor)),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: const Text(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
                   'Or continue with',
                   style: TextStyle(
                     color: AppTheme.textGray,
@@ -253,7 +253,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                   ),
                 ),
               ),
-              const Expanded(child: Divider(color: AppTheme.dividerColor)),
+              Expanded(child: Divider(color: AppTheme.dividerColor)),
             ],
           ),
 
@@ -307,7 +307,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Sign up to get started',
             style: TextStyle(
               fontSize: 14,

@@ -14,7 +14,7 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
-  int _navIndex = 3; // Chat is at index 3 (correct)
+  final int _navIndex = 3; // Chat is at index 3 (correct)
 
   // Sample active trail chat
   final Map<String, dynamic>? activeTrail = {
@@ -166,13 +166,13 @@ class _ChatListPageState extends State<ChatListPage> {
             // Navigate to Pingtrail
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => PingtrailPage()),
+              MaterialPageRoute(builder: (_) => const PingtrailPage()),
             );
           } else if (index == 1) {
             // Navigate to Pingpals
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => PingpalsPage()),
+              MaterialPageRoute(builder: (_) => const PingpalsPage()),
             );
           }
         },
@@ -367,8 +367,8 @@ class _ChatListPageState extends State<ChatListPage> {
                             color: Colors.green.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Row(
-                            children: const [
+                          child: const Row(
+                            children: [
                               Icon(
                                 FontAwesomeIcons.circle,
                                 color: Colors.green,

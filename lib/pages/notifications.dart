@@ -15,7 +15,7 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _navIndex = 1; // Requests tab
+  final int _navIndex = 1; // Requests tab
   int _newNotificationsCount = 2;
 
   @override
@@ -303,9 +303,9 @@ class _NotificationsPageState extends State<NotificationsPage>
               children: [
                 Stack(
                 children: [
-                  CircleAvatar(
+                  const CircleAvatar(
                     radius: 28,
-                    backgroundImage: const NetworkImage(
+                    backgroundImage: NetworkImage(
                       'https://i.pravatar.cc/150?img=3',
                     ),
                   ),

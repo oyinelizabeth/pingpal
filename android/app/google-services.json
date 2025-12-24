@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "791121226346",
+    "project_id": "pingpal-16d18",
+    "storage_bucket": "pingpal-16d18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:791121226346:android:807349d28614b11d243813",
+        "android_client_info": {
+          "package_name": "com.example.pingpal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBNI_f45d3JZbeX6sKJmEa5bZ7VfSf20M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

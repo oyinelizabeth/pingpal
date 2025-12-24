@@ -215,8 +215,8 @@ class _BlockedPingpalsPageState extends State<BlockedPingpalsPage> {
                       color: Colors.green.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      children: const [
+                    child: const Row(
+                      children: [
                         Icon(
                           FontAwesomeIcons.arrowsRotate,
                           color: Colors.green,

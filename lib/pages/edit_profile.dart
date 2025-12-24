@@ -195,9 +195,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     Center(
                       child: Stack(
                         children: [
-                          CircleAvatar(
+                          const CircleAvatar(
                             radius: 70,
-                            backgroundImage: const NetworkImage(
+                            backgroundImage: NetworkImage(
                               'https://i.pravatar.cc/300?img=12',
                             ),
                           ),
@@ -279,11 +279,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         fillColor: AppTheme.cardBackground,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.borderColor),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.borderColor),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -327,11 +327,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         fillColor: AppTheme.cardBackground,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.borderColor),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.borderColor),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -380,11 +380,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         fillColor: AppTheme.cardBackground,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.borderColor),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.borderColor),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

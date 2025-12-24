@@ -15,7 +15,7 @@ class PingtrailPage extends StatefulWidget {
 }
 
 class _PingtrailPageState extends State<PingtrailPage> {
-  int _navIndex = 0; // Pingtrail is at index 0 (correct)
+  final int _navIndex = 0; // Pingtrail is at index 0 (correct)
 
   // Sample data for active pingtrail
   final Map<String, dynamic>? activePingtrail = {
@@ -57,10 +57,10 @@ class _PingtrailPageState extends State<PingtrailPage> {
                 const SizedBox(height: 20),
 
                 // Header with profile icon
-                Row(
+                const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Pingtrail Hub',
                       style: TextStyle(
                         fontSize: 32,
@@ -71,7 +71,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                     CircleAvatar(
                       radius: 22,
                       backgroundColor: AppTheme.cardBackground,
-                      backgroundImage: const NetworkImage(
+                      backgroundImage: NetworkImage(
                         "https://i.pravatar.cc/150?img=8",
                       ),
                     ),
@@ -234,18 +234,18 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: AppTheme.borderColor),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               FontAwesomeIcons.clockRotateLeft,
                               color: AppTheme.textWhite,
                               size: 20,
                             ),
-                            const SizedBox(width: 12),
-                            const Text(
+                            SizedBox(width: 12),
+                            Text(
                               'View Full History',
                               style: TextStyle(
                                 fontSize: 16,
@@ -255,7 +255,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                             ),
                           ],
                         ),
-                        const Icon(
+                        Icon(
                           FontAwesomeIcons.chevronRight,
                           color: AppTheme.textGray,
                           size: 16,
@@ -283,13 +283,13 @@ class _PingtrailPageState extends State<PingtrailPage> {
             // Navigate to Pingpals
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => PingpalsPage()),
+              MaterialPageRoute(builder: (_) => const PingpalsPage()),
             );
           } else if (index == 3) {
             // Navigate to Chat
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => ChatListPage()),
+              MaterialPageRoute(builder: (_) => const ChatListPage()),
             );
           }
         },
@@ -349,8 +349,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
                         color: AppTheme.primaryBlue,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
-                        children: const [
+                      child: const Row(
+                        children: [
                           Icon(
                             Icons.circle,
                             color: Colors.white,
@@ -547,7 +547,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
             color: AppTheme.textGray.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'No active pingtrail',
             style: TextStyle(
               fontSize: 16,
@@ -620,14 +620,14 @@ class _PingtrailPageState extends State<PingtrailPage> {
                         color: AppTheme.inputBackground,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
                           Icon(
                             FontAwesomeIcons.circleCheck,
                             color: AppTheme.textGray,
                             size: 12,
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: 6),
                           Text(
                             'COMPLETED',
                             style: TextStyle(

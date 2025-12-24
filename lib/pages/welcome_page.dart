@@ -329,9 +329,9 @@ class _WelcomePageState extends State<WelcomePage>
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Text(
                     'Create Account',
                     style: TextStyle(

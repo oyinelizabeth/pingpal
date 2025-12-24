@@ -563,16 +563,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 borderRadius: BorderRadius.circular(25),
                 border: Border.all(color: AppTheme.borderColor),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     FontAwesomeIcons.clock,
                     color: AppTheme.textGray,
                     size: 14,
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
+                  SizedBox(width: 8),
+                  Text(
                     'Ping Request Sent',
                     style: TextStyle(
                       fontSize: 16,

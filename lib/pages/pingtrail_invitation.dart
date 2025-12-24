@@ -15,7 +15,7 @@ class PingtrailInvitationPage extends StatefulWidget {
 
 class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     with SingleTickerProviderStateMixin {
-  int _navIndex = 1;
+  final int _navIndex = 1;
   late AnimationController _pulseController;
 
   @override
@@ -188,10 +188,10 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
                                 color: AppTheme.primaryBlue,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
+                                children: [
                                   Icon(
                                     FontAwesomeIcons.envelope,
                                     color: Colors.white,
@@ -263,9 +263,9 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
                           color: AppTheme.inputBackground,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
+                          children: [
                             Icon(
                               FontAwesomeIcons.locationDot,
                               color: AppTheme.primaryBlue,
@@ -344,8 +344,8 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
                             ),
                             Column(
                               children: [
-                                Row(
-                                  children: const [
+                                const Row(
+                                  children: [
                                     Icon(
                                       FontAwesomeIcons.clock,
                                       color: AppTheme.primaryBlue,
