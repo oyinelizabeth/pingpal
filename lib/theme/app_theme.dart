@@ -19,6 +19,7 @@ class AppTheme {
   static const Color borderColor = Color(0xFF1E3A5F);
   static const Color dividerColor = Color(0xFF2D3E50);
 
+
   static ThemeData darkTheme = ThemeData(
     primaryColor: primaryBlue,
     scaffoldBackgroundColor: darkBackground,

@@ -13,7 +13,7 @@ class RequestsPage extends StatefulWidget {
 class _RequestsPageState extends State<RequestsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _navIndex = 1; // Requests is at index 1
+  final int _navIndex = 1; // Requests is at index 1
   int _newRequestsCount = 3;
 
   @override
@@ -276,7 +276,7 @@ class _RequestsPageState extends State<RequestsPage>
               children: [
                 Text(
                   'NEW REQUESTS ($_newRequestsCount)',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGray,
@@ -308,8 +308,8 @@ class _RequestsPageState extends State<RequestsPage>
           const SizedBox(height: 32),
 
           // Suggested Pingpals
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
             child: Text(
               'SUGGESTED PINGPALS',
               style: TextStyle(
@@ -418,7 +418,7 @@ class _RequestsPageState extends State<RequestsPage>
                       const SizedBox(height: 4),
                       Text(
                         request["message"],
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           color: AppTheme.textGray,
                         ),
@@ -561,7 +561,7 @@ class _RequestsPageState extends State<RequestsPage>
             color: AppTheme.textGray.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'No sent requests',
             style: TextStyle(
               fontSize: 16,

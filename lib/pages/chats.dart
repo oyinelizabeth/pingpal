@@ -119,9 +119,9 @@ class ChatPage extends StatelessWidget {
                   const SizedBox(width: 8),
 
                   /// Send button (currently not wired to backend logic)
-                  CircleAvatar(
+                  const CircleAvatar(
                     backgroundColor: AppTheme.primaryBlue,
-                    child: const Icon(Icons.send, color: Colors.white),
+                    child: Icon(Icons.send, color: Colors.white),
                   )
                 ],
               ),

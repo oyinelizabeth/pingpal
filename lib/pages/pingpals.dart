@@ -16,7 +16,7 @@ class PingpalsPage extends StatefulWidget {
 }
 
 class _PingpalsPageState extends State<PingpalsPage> {
-  int _navIndex = 1; // Pingpals is at index 1 (correct)
+  final int _navIndex = 1; // Pingpals is at index 1 (correct)
   final TextEditingController _searchController = TextEditingController();
   String _sortBy = 'Recent';
 
@@ -381,7 +381,7 @@ class _PingpalsPageState extends State<PingpalsPage> {
                   ),
                   TextButton(
                     onPressed: _showSortOptions,
-                    child: Text(
+                    child: const Text(
                       'Sort by',
                       style: TextStyle(
                         fontSize: 13,
@@ -421,13 +421,13 @@ class _PingpalsPageState extends State<PingpalsPage> {
             // Navigate to Pingtrail
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => PingtrailPage()),
+              MaterialPageRoute(builder: (_) => const PingtrailPage()),
             );
           } else if (index == 3) {
             // Navigate to Chat
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => ChatListPage()),
+              MaterialPageRoute(builder: (_) => const ChatListPage()),
             );
           }
         },

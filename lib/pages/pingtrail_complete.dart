@@ -25,7 +25,7 @@ class PingtrailCompletePage extends StatefulWidget {
 
 class _PingtrailCompletePageState extends State<PingtrailCompletePage>
     with SingleTickerProviderStateMixin {
-  int _navIndex = 0;
+  final int _navIndex = 0;
   late AnimationController _animationController;
 
   @override

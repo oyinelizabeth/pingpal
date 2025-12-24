@@ -21,12 +21,12 @@ class SelectDestinationPage extends StatefulWidget {
 }
 
 class _SelectDestinationPageState extends State<SelectDestinationPage> {
-  int _navIndex = 0;
+  final int _navIndex = 0;
   final TextEditingController _searchController = TextEditingController(
     text: 'Cosmic Bowli',
   );
   GoogleMapController? _mapController;
-  bool _showDestinationDetails = true;
+  final bool _showDestinationDetails = true;
 
   // Sample destination data
   final Map<String, dynamic> selectedDestination = {
@@ -109,7 +109,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                     destination: selectedDestination["name"],
                     duration: '45m 12s',
                     distance: '3.2 km',
-                    participants: [
+                    participants: const [
                       {
                         "name": "You",
                         "avatar": "https://i.pravatar.cc/150?img=8",
@@ -402,7 +402,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                               const SizedBox(width: 12),
 
                               // Rating
-                              Icon(
+                              const Icon(
                                 FontAwesomeIcons.solidStar,
                                 color: Colors.amber,
                                 size: 14,
