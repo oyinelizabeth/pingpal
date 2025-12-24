@@ -11,14 +11,16 @@ class PingPalSearchBar extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.inputBackground,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: AppTheme.softPink, width: 2),
+        border: Border.all(color: AppTheme.borderColor, width: 1.5),
       ),
       child: TextField(
+        style: const TextStyle(color: AppTheme.textWhite),
         decoration: InputDecoration(
-          icon: Icon(Icons.search, color: AppTheme.primaryPink),
+          icon: const Icon(Icons.search, color: AppTheme.primaryBlue),
           hintText: hint,
+          hintStyle: TextStyle(color: AppTheme.textGray.withOpacity(0.6)),
           border: InputBorder.none,
         ),
       ),

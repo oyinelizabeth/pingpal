@@ -86,16 +86,16 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.darkBackground,
 
       // ------------------------ APP BAR -------------------------
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppTheme.darkBackground,
         elevation: 0,
         title: const Text(
           "Welcome back 👋",
           style: TextStyle(
-            color: AppTheme.textBlack,
+            color: AppTheme.textWhite,
             fontSize: 22,
             fontWeight: FontWeight.w600,
           ),
@@ -109,7 +109,7 @@ class _HomePageState extends State<HomePage> {
               onTap: _openProfile,
               child: const CircleAvatar(
                 radius: 22,
-                backgroundColor: AppTheme.softPink,
+                backgroundColor: AppTheme.cardBackground,
                 backgroundImage:
                     NetworkImage("https://i.pravatar.cc/150?img=5"),
               ),
@@ -155,7 +155,7 @@ class _HomePageState extends State<HomePage> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textBlack,
+                  color: AppTheme.textWhite,
                 ),
               ),
               const SizedBox(height: 12),
@@ -167,8 +167,8 @@ class _HomePageState extends State<HomePage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: AppTheme.softPink, width: 1.7),
+                    color: AppTheme.cardBackground,
+                    border: Border.all(color: AppTheme.borderColor, width: 1.5),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Column(
@@ -202,7 +202,7 @@ class _HomePageState extends State<HomePage> {
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: AppTheme.textBlack,
+                                      color: AppTheme.textWhite,
                                     ),
                                   ),
                                   Text(
@@ -211,7 +211,7 @@ class _HomePageState extends State<HomePage> {
                                       fontSize: 14,
                                       color: friend["online"]
                                           ? Colors.green
-                                          : Colors.grey,
+                                          : AppTheme.textGray,
                                     ),
                                   ),
                                 ],
@@ -223,7 +223,7 @@ class _HomePageState extends State<HomePage> {
                               const Icon(
                                 Icons.arrow_forward_ios,
                                 size: 18,
-                                color: AppTheme.primaryPink,
+                                color: AppTheme.primaryBlue,
                               ),
                             ],
                           ),
@@ -233,7 +233,7 @@ class _HomePageState extends State<HomePage> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 12),
                               child: Divider(
-                                color: AppTheme.softPink,
+                                color: AppTheme.dividerColor,
                                 thickness: 1,
                                 height: 1,
                               ),
@@ -253,7 +253,7 @@ class _HomePageState extends State<HomePage> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textBlack,
+                  color: AppTheme.textWhite,
                 ),
               ),
               const SizedBox(height: 12),
@@ -306,19 +306,19 @@ class _HomePageState extends State<HomePage> {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppTheme.softPink.withOpacity(0.35),
+          color: AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.softPink, width: 1.5),
+          border: Border.all(color: AppTheme.borderColor, width: 1.5),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppTheme.primaryPink, size: 26),
+            Icon(icon, color: AppTheme.primaryBlue, size: 26),
             const SizedBox(height: 8),
             Text(
               label,
               style: const TextStyle(
-                color: AppTheme.textBlack,
+                color: AppTheme.textWhite,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),

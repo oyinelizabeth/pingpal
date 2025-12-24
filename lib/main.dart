@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pingpal/pages/auth_page.dart';
+import 'package:pingpal/pages/welcome_page.dart';
 import 'pages/login.dart';
 import 'theme/app_theme.dart';
 
@@ -16,9 +17,9 @@ class PingPalApp extends StatelessWidget {
       title: 'PingPal',
       debugShowCheckedModeBanner: false,
 
-      theme: AppTheme.lightTheme,
+          theme: AppTheme.darkTheme,
 
-      home: const AuthPage(),
+      home: const WelcomePage(),
     );
   }
 }

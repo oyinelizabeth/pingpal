@@ -56,10 +56,10 @@ class ChatPage extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(vertical: 4),
 
                     decoration: BoxDecoration(
-                      // pink for user messages, soft pink for friend messages.
+                      // blue for user messages, card background for friend messages.
                       color: isMe
-                          ? AppTheme.primaryPink
-                          : AppTheme.softPink.withOpacity(0.6),
+                          ? AppTheme.primaryBlue
+                          : AppTheme.cardBackground,
 
                       // Rounded corners, with tail depending on who sent it.
                       borderRadius: BorderRadius.only(
@@ -74,7 +74,7 @@ class ChatPage extends StatelessWidget {
                     child: Text(
                       msg["text"] as String,
                       style: TextStyle(
-                        color: isMe ? Colors.white : Colors.black87,
+                        color: isMe ? Colors.white : AppTheme.textWhite,
                       ),
                     ),
                   ),
@@ -94,10 +94,23 @@ class ChatPage extends StatelessWidget {
                   /// Text entry box
                   Expanded(
                     child: TextField(
+                      style: const TextStyle(color: AppTheme.textWhite),
                       decoration: InputDecoration(
                         hintText: "Message...",
+                        hintStyle: TextStyle(color: AppTheme.textGray.withOpacity(0.6)),
+                        filled: true,
+                        fillColor: AppTheme.inputBackground,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: AppTheme.borderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: AppTheme.primaryBlue, width: 2),
                         ),
                       ),
                     ),
@@ -107,8 +120,8 @@ class ChatPage extends StatelessWidget {
 
                   /// Send button (currently not wired to backend logic)
                   CircleAvatar(
-                    backgroundColor: AppTheme.primaryPink,
-                    child: Icon(Icons.send, color: Colors.white),
+                    backgroundColor: AppTheme.primaryBlue,
+                    child: const Icon(Icons.send, color: Colors.white),
                   )
                 ],
               ),

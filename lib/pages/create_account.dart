@@ -133,7 +133,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                             );
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.primaryPink,
+                            foregroundColor: AppTheme.primaryBlue,
                           ),
                           child: const Text('Log in'),
                         )

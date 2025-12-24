@@ -52,9 +52,9 @@ class ChatsPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppTheme.cardBackground,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.softPink, width: 1.7),
+                border: Border.all(color: AppTheme.borderColor, width: 1.5),
               ),
               child: Row(
                 children: [
@@ -76,13 +76,14 @@ class ChatsPage extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
+                            color: AppTheme.textWhite,
                           ),
                         ),
                         Text(
                           chat["lastMessage"],
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Colors.grey,
+                            color: AppTheme.textGray,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -93,7 +94,10 @@ class ChatsPage extends StatelessWidget {
                   // time
                   Text(
                     chat["time"],
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textGray,
+                    ),
                   ),
                 ],
               ),
