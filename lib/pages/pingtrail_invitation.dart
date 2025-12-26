@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
-import 'dart:math' as math;
 
 class PingtrailInvitationPage extends StatefulWidget {
   const PingtrailInvitationPage({super.key});

@@ -465,7 +465,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             onChanged: (val) {
                               setState(() => _ghostModeEnabled = val);
                             },
-                            activeColor: AppTheme.primaryBlue,
+                            activeThumbColor: AppTheme.primaryBlue,
                             activeTrackColor: AppTheme.primaryBlue.withOpacity(0.5),
                             inactiveThumbColor: AppTheme.textGray,
                             inactiveTrackColor: AppTheme.textGray.withOpacity(0.3),
@@ -527,7 +527,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             onChanged: (val) {
                               setState(() => _publicVisibilityEnabled = val);
                             },
-                            activeColor: AppTheme.primaryBlue,
+                            activeThumbColor: AppTheme.primaryBlue,
                             activeTrackColor: AppTheme.primaryBlue.withOpacity(0.5),
                             inactiveThumbColor: AppTheme.textGray,
                             inactiveTrackColor: AppTheme.textGray.withOpacity(0.3),
