@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services") 
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -21,14 +21,14 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
-defaultConfig {
-    applicationId = "com.example.pingpal"
-    minSdk = 23
-    targetSdk = 36
+    defaultConfig {
+        applicationId = "com.example.pingpal"
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
 
-    versionCode = 1
-    versionName = "1.0"
-}
+        versionCode = 1
+        versionName = "1.0"
+    }
 
 
     buildTypes {

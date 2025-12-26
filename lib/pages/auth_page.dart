@@ -1,5 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../theme/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
@@ -15,8 +19,13 @@ class AuthPage extends StatefulWidget {
   State<AuthPage> createState() => _AuthPageState();
 }
 
-class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin {
+class _AuthPageState extends State<AuthPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final confirmController = TextEditingController();
 
   @override
   void initState() {
@@ -26,6 +35,151 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       vsync: this,
       initialIndex: widget.initialTab,
     );
+  }
+
+  bool loading = false;
+
+  Future<void> login() async {
+    setState(() => loading = true);
+    try {
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      final user = userCredential.user;
+      if (user != null) {
+        final userDoc =
+            FirebaseFirestore.instance.collection('users').doc(user.uid);
+        final snapshot = await userDoc.get();
+
+        if (!snapshot.exists) {
+          await userDoc.set({
+            'uid': user.uid,
+            'email': user.email ?? '',
+            'lastLogin': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await userDoc.update({
+            'lastLogin': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      _clearFields();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login successful")),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "Login failed")),
+      );
+    }
+    setState(() => loading = false);
+  }
+
+  Future<void> register() async {
+    setState(() => loading = true);
+    try {
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      final user = userCredential.user;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'fullName': nameController.text.trim(),
+          'email': emailController.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        _tabController.animateTo(0);
+        _clearFields();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Account created successfully")),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "Registration failed")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
+    setState(() => loading = false);
+  }
+
+  Future<void> signInWithGoogle(BuildContext context) async {
+    try {
+      final googleUser = await GoogleSignIn.standard().signIn();
+      if (googleUser == null) return;
+
+      final googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc =
+            FirebaseFirestore.instance.collection('users').doc(user.uid);
+        final snapshot = await userDoc.get();
+
+        if (!snapshot.exists) {
+          await userDoc.set({
+            'uid': user.uid,
+            'fullName': user.displayName ?? '',
+            'email': user.email ?? '',
+            'photoURL': user.photoURL ?? '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastLogin': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await userDoc.update({
+            'lastLogin': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login successful")),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? "Google login failed")));
+    } catch (_) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Something went wrong")));
+    }
+  }
+
+  void _clearFields() {
+    nameController.clear();
+    emailController.clear();
+    passwordController.clear();
+    confirmController.clear();
   }
 
   @override
@@ -173,9 +327,6 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildLoginForm() {
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -227,15 +378,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           const SizedBox(height: 16),
 
           // Login Button
-          CustomButton(
-            text: "Log in",
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const HomePage()),
-              );
-            },
-          ),
+          CustomButton(text: "Log in", onPressed: login),
 
           const SizedBox(height: 32),
 
@@ -274,7 +417,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                 child: _buildSocialButton(
                   icon: FontAwesomeIcons.google,
                   label: 'Google',
-                  onPressed: () {},
+                  onPressed: () => signInWithGoogle(context),
                 ),
               ),
             ],
@@ -287,11 +430,6 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildSignUpForm() {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-    final confirmController = TextEditingController();
-
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -354,16 +492,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           const SizedBox(height: 24),
 
           // Sign Up Button
-          CustomButton(
-            text: 'Create account',
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const HomePage()),
-                (route) => false,
-              );
-            },
-          ),
+          CustomButton(text: 'Create account', onPressed: register),
 
           const SizedBox(height: 24),
 
@@ -394,7 +523,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                 child: _buildSocialButton(
                   icon: FontAwesomeIcons.google,
                   label: 'Google',
-                  onPressed: () {},
+                  onPressed: () => signInWithGoogle(context),
                 ),
               ),
               const SizedBox(width: 12),
