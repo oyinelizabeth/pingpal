@@ -302,128 +302,128 @@ class _NotificationsPageState extends State<NotificationsPage>
             Row(
               children: [
                 Stack(
-                children: [
-                  const CircleAvatar(
-                    radius: 28,
-                    backgroundImage: NetworkImage(
-                      'https://i.pravatar.cc/150?img=3',
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryBlue,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppTheme.cardBackground,
-                          width: 2,
-                        ),
-                      ),
-                      child: const Icon(
-                        FontAwesomeIcons.plus,
-                        color: Colors.white,
-                        size: 10,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Sarah J.',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textWhite,
+                    const CircleAvatar(
+                      radius: 28,
+                      backgroundImage: NetworkImage(
+                        'https://i.pravatar.cc/150?img=3',
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Wants to be your Pingpal',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.textGray.withOpacity(0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '2 min ago',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textGray.withOpacity(0.6),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppTheme.cardBackground,
+                            width: 2,
+                          ),
+                        ),
+                        child: const Icon(
+                          FontAwesomeIcons.plus,
+                          color: Colors.white,
+                          size: 10,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
-                    ),
-                    borderRadius: BorderRadius.circular(25),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Sarah J.',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textWhite,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Wants to be your Pingpal',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textGray.withOpacity(0.8),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '2 min ago',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textGray.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: ElevatedButton(
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
+                      ),
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // Accept pingpal request
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                      ),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
                     onPressed: () {
-                      // Accept pingpal request
+                      // Decline request
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
+                    style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: BorderSide(
+                        color: AppTheme.textGray.withOpacity(0.3),
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(25),
                       ),
                     ),
                     child: const Text(
-                      'Accept',
+                      'Decline',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: AppTheme.textWhite,
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    // Decline request
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(
-                      color: AppTheme.textGray.withOpacity(0.3),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                  ),
-                  child: const Text(
-                    'Decline',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textWhite,
-                    ),
-                  ),
-                ),
-              ),
               ],
             ),
           ],

@@ -498,7 +498,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const WelcomePage()),
-                (route) => false,
+                    (route) => false,
               );
             },
             child: const Text(
