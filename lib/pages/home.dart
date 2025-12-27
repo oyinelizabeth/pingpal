@@ -10,6 +10,9 @@ import 'inbox.dart';
 import 'map.dart';
 import 'notifications.dart';
 import 'requests.dart';
+import 'pingtrail.dart';
+import 'pingpals.dart';
+import 'settings.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,7 +22,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentNavIndex = 0;
+  // Start on the Home (map) which corresponds to the center nav item (index 2)
+  int _currentNavIndex = 2;
   GoogleMapController? _mapController;
   bool _hasNotifications = true;
 
@@ -48,16 +52,13 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     // Do not build widgets that depend on context/MediaQuery in initState.
-    // Index 0 is handled specially in build() via _buildMapView().
-    _pages.addAll(const [
-      SizedBox.shrink(), // placeholder for index 0 (map view is built in build())
-      MapPage(),
-      ChatsPage(),
-      // RequestsPage is not const, add below outside the const list
-    ]);
+    // Index 2 (center) is handled specially in build() via _buildMapView().
     _pages.addAll([
-      RequestsPage(),
-      const ProfilePage(),
+      const PingtrailPage(), // index 0 - Pingtrail
+      const PingpalsPage(),  // index 1 - Pingpals
+      const SizedBox.shrink(), // index 2 - placeholder, map is built in build()
+      const ChatsPage(),     // index 3 - Chat
+      const SettingsPage(),  // index 4 - Settings
     ]);
   }
 
@@ -102,7 +103,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       extendBodyBehindAppBar: true,
-      body: _currentNavIndex == 0 ? _buildMapView() : _pages[_currentNavIndex],
+      body: _currentNavIndex == 2 ? _buildMapView() : _pages[_currentNavIndex],
       bottomNavigationBar: NavBar(
         currentIndex: _currentNavIndex,
         onTap: (index) {
