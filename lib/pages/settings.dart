@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:pingpal/pages/delete_account_page.dart';
 import 'package:pingpal/pages/welcome_page.dart';
 
 import '../theme/app_theme.dart';
@@ -541,7 +542,11 @@ class _SettingsPageState extends State<SettingsPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              // TODO: Implement delete account logic
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const DeleteAccountPage()),
+              );
             },
             child: const Text(
               'Delete',

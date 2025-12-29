@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/password_text_field.dart';
+import 'forget_password.dart';
 import 'home.dart';
 
 class AuthPage extends StatefulWidget {
@@ -43,7 +44,7 @@ class _AuthPageState extends State<AuthPage>
     setState(() => loading = true);
     try {
       UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
@@ -51,7 +52,7 @@ class _AuthPageState extends State<AuthPage>
       final user = userCredential.user;
       if (user != null) {
         final userDoc =
-            FirebaseFirestore.instance.collection('users').doc(user.uid);
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
         final snapshot = await userDoc.get();
 
         if (!snapshot.exists) {
@@ -75,7 +76,7 @@ class _AuthPageState extends State<AuthPage>
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
-        (route) => false,
+            (route) => false,
       );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,7 +90,7 @@ class _AuthPageState extends State<AuthPage>
     setState(() => loading = true);
     try {
       UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
@@ -138,7 +139,7 @@ class _AuthPageState extends State<AuthPage>
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final userDoc =
-            FirebaseFirestore.instance.collection('users').doc(user.uid);
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
         final snapshot = await userDoc.get();
 
         if (!snapshot.exists) {
@@ -164,7 +165,7 @@ class _AuthPageState extends State<AuthPage>
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
-        (route) => false,
+            (route) => false,
       );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -364,7 +365,12 @@ class _AuthPageState extends State<AuthPage>
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
+                );
+              },
               style: TextButton.styleFrom(
                 foregroundColor: AppTheme.primaryBlue,
               ),
