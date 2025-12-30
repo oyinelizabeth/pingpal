@@ -25,7 +25,7 @@ class _HomePageState extends State<HomePage> {
   // Start on the Home (map) which corresponds to the center nav item (index 2)
   int _currentNavIndex = 2;
   GoogleMapController? _mapController;
-  bool _hasNotifications = true;
+  final bool _hasNotifications = true;
 
   final List<Widget> _pages = [];
 

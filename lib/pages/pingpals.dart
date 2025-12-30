@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'requests.dart';
@@ -7,6 +9,7 @@ import 'user_profile.dart';
 import 'chats.dart';
 import 'pingtrail.dart';
 import 'chat_list.dart';
+import 'add_friends.dart';
 
 class PingpalsPage extends StatefulWidget {
   const PingpalsPage({super.key});
@@ -16,55 +19,12 @@ class PingpalsPage extends StatefulWidget {
 }
 
 class _PingpalsPageState extends State<PingpalsPage> {
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
   final int _navIndex = 1; // Pingpals is at index 1 (correct)
   final TextEditingController _searchController = TextEditingController();
   String _sortBy = 'Recent';
 
-  // Sample pingpals data
-  final List<Map<String, dynamic>> pingpals = [
-    {
-      "name": "Alex Chen",
-      "username": "@alexc",
-      "avatar": "https://i.pravatar.cc/150?img=1",
-      "status": "Nearby",
-      "isOnline": true,
-      "lastSeen": null,
-    },
-    {
-      "name": "Davide Rossi",
-      "username": "@davide",
-      "avatar": "https://i.pravatar.cc/150?img=4",
-      "status": "Active now",
-      "isOnline": true,
-      "lastSeen": null,
-    },
-    {
-      "name": "Sarah Jones",
-      "username": "@sarah_jones",
-      "avatar": "https://i.pravatar.cc/150?img=3",
-      "status": "2h ago",
-      "isOnline": false,
-      "lastSeen": "2h ago",
-    },
-    {
-      "name": "Marcus Johnson",
-      "username": "@marcus_j",
-      "avatar": "https://i.pravatar.cc/150?img=2",
-      "status": "Last seen 1d ago",
-      "isOnline": false,
-      "lastSeen": "1d ago",
-    },
-    {
-      "name": "Elara Vance",
-      "username": "@elara_v",
-      "avatar": "https://i.pravatar.cc/150?img=5",
-      "status": "Last seen 3d ago",
-      "isOnline": false,
-      "lastSeen": "3d ago",
-    },
-  ];
 
-  int get newRequestsCount => 3; // From requests page
 
   @override
   void dispose() {
@@ -234,7 +194,12 @@ class _PingpalsPageState extends State<PingpalsPage> {
                 ),
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // TODO: Add new pingpal
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AddFriendPage(),
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
@@ -299,31 +264,43 @@ class _PingpalsPageState extends State<PingpalsPage> {
                               color: AppTheme.primaryBlue,
                               size: 20,
                             ),
-                            if (newRequestsCount > 0)
-                              Positioned(
-                                top: -4,
-                                right: -4,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.primaryBlue,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  constraints: const BoxConstraints(
-                                    minWidth: 16,
-                                    minHeight: 16,
-                                  ),
-                                  child: Text(
-                                    newRequestsCount.toString(),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('friend_requests')
+                                  .where('receiverId', isEqualTo: currentUserId)
+                                  .where('status', isEqualTo: 'pending')
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                final count = snapshot.data?.docs.length ?? 0;
+                                if (count == 0) return const SizedBox();
+
+                                return Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: AppTheme.primaryBlue,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 16,
+                                      minHeight: 16,
+                                    ),
+                                    child: Text(
+                                      count.toString(),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
+                                );
+                              },
+                            ),
+
                           ],
                         ),
                       ),
@@ -341,13 +318,23 @@ class _PingpalsPageState extends State<PingpalsPage> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              '$newRequestsCount received • 1 sent',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.textGray.withOpacity(0.8),
+                              StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('friend_requests')
+                                    .where('receiverId', isEqualTo: currentUserId)
+                                    .where('status', isEqualTo: 'pending')
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  final received = snapshot.data?.docs.length ?? 0;
+                                  return Text(
+                                    '$received received',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.textGray.withOpacity(0.8),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -370,15 +357,29 @@ class _PingpalsPageState extends State<PingpalsPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'MY PINGPALS (${pingpals.length})',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textGray.withOpacity(0.6),
-                      letterSpacing: 1,
-                    ),
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(currentUserId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox();
+
+                      final data = snapshot.data!.data() as Map<String, dynamic>;
+                      final count = (data['friends'] ?? []).length;
+
+                      return Text(
+                        'MY PINGPALS ($count)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textGray.withOpacity(0.6),
+                          letterSpacing: 1,
+                        ),
+                      );
+                    },
                   ),
+
                   TextButton(
                     onPressed: _showSortOptions,
                     child: const Text(
@@ -398,14 +399,52 @@ class _PingpalsPageState extends State<PingpalsPage> {
 
             // Pingpals List
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                itemCount: pingpals.length,
-                itemBuilder: (context, index) {
-                  return _buildPingpalCard(pingpals[index]);
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUserId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final List friends = data['friends'] ?? [];
+
+                  if (friends.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No Pingpals yet',
+                        style: TextStyle(color: AppTheme.textGray),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: friends.length,
+                    itemBuilder: (context, index) {
+                      return StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(friends[index])
+                            .snapshots(),
+                        builder: (context, userSnap) {
+                          if (!userSnap.hasData) return const SizedBox();
+
+                          final pingpal =
+                          userSnap.data!.data() as Map<String, dynamic>;
+
+                          return _buildPingpalCard(pingpal);
+                        },
+                      );
+                    },
+                  );
                 },
               ),
             ),
+
           ],
         ),
       ),
@@ -463,8 +502,21 @@ class _PingpalsPageState extends State<PingpalsPage> {
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundImage: NetworkImage(pingpal["avatar"]),
+                  backgroundColor: AppTheme.primaryBlue.withOpacity(0.15),
+                  backgroundImage: pingpal["photoUrl"] != null &&
+                      pingpal["photoUrl"].toString().isNotEmpty
+                      ? NetworkImage(pingpal["photoUrl"])
+                      : null,
+                  child: pingpal["photoUrl"] == null ||
+                      pingpal["photoUrl"].toString().isEmpty
+                      ? const Icon(
+                    Icons.person,
+                    color: AppTheme.primaryBlue,
+                    size: 30,
+                  )
+                      : null,
                 ),
+
                 if (pingpal["isOnline"])
                   Positioned(
                     bottom: 0,
@@ -493,7 +545,7 @@ class _PingpalsPageState extends State<PingpalsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    pingpal["name"],
+                    pingpal["fullName"],
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
@@ -502,7 +554,7 @@ class _PingpalsPageState extends State<PingpalsPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${pingpal["username"]} • ${pingpal["status"]}',
+                    pingpal["email"],
                     style: TextStyle(
                       fontSize: 13,
                       color: AppTheme.textGray.withOpacity(0.8),

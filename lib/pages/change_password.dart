@@ -5,7 +5,6 @@ import 'package:pingpal/pages/forget_password.dart';
 import 'package:pingpal/pages/welcome_page.dart';
 
 import '../theme/app_theme.dart';
-import 'auth_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});

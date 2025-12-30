@@ -12,29 +12,29 @@ android {
     // Required for Firebase, Maps, Geolocator
     ndkVersion = "27.0.12077973"
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
     defaultConfig {
         applicationId = "com.example.pingpal"
-        minSdk = flutter.minSdkVersion
+        minSdk = 23
         targetSdk = 36
 
         versionCode = 1
         versionName = "1.0"
     }
 
-
     buildTypes {
         release {
+            // Using debug signing for now (OK for uni project)
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = "11"
     }
 }
 

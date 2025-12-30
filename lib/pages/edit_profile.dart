@@ -544,7 +544,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             onChanged: (val) {
                               setState(() => _ghostModeEnabled = val);
                             },
-                            activeThumbColor: AppTheme.primaryBlue,
+                            thumbColor: MaterialStateProperty.resolveWith<Color?>(
+                                  (states) {
+                                if (states.contains(MaterialState.selected)) {
+                                  return AppTheme.primaryBlue;
+                                }
+                                return null;
+                              },
+                            ),
+
                             activeTrackColor:
                             AppTheme.primaryBlue.withOpacity(0.5),
                             inactiveThumbColor: AppTheme.textGray,
@@ -608,7 +616,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             onChanged: (val) {
                               setState(() => _publicVisibilityEnabled = val);
                             },
-                            activeThumbColor: AppTheme.primaryBlue,
+                            thumbColor: MaterialStateProperty.resolveWith<Color?>(
+                                  (states) {
+                                if (states.contains(MaterialState.selected)) {
+                                  return AppTheme.primaryBlue;
+                                }
+                                return null;
+                              },
+                            ),
+
                             activeTrackColor:
                             AppTheme.primaryBlue.withOpacity(0.5),
                             inactiveThumbColor: AppTheme.textGray,

@@ -1,6 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
@@ -13,9 +14,9 @@ class RequestsPage extends StatefulWidget {
 
 class _RequestsPageState extends State<RequestsPage>
     with SingleTickerProviderStateMixin {
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
   late TabController _tabController;
   final int _navIndex = 1; // Requests is at index 1
-  int _newRequestsCount = 3;
 
   @override
   void initState() {
@@ -29,86 +30,53 @@ class _RequestsPageState extends State<RequestsPage>
     super.dispose();
   }
 
-  // Sample data for received requests
-  final List<Map<String, dynamic>> receivedRequests = [
-    {
-      "name": "Alex Chen",
-      "username": "@alexc",
-      "avatar": "https://i.pravatar.cc/150?img=1",
-      "time": "2m ago",
-      "message": "Found you via nearby trails",
-      "verified": true,
-      "hasLocation": true,
-    },
-    {
-      "name": "Marcus Johnson",
-      "username": "@marcus_j",
-      "avatar": "https://i.pravatar.cc/150?img=2",
-      "time": "1h ago",
-      "message": "Wants to join your Pingtrail to Downtown",
-      "verified": false,
-      "hasLocation": false,
-    },
-    {
-      "name": "Sarah Jones",
-      "username": "@sarah_jones",
-      "avatar": "https://i.pravatar.cc/150?img=3",
-      "time": "yesterday",
-      "message": "",
-      "verified": false,
-      "hasLocation": false,
-    },
-  ];
 
-  // Sample data for suggested pingpals
-  final List<Map<String, dynamic>> suggestedPingpals = [
-    {
-      "name": "Davide",
-      "avatar": "https://i.pravatar.cc/150?img=4",
-    },
-    {
-      "name": "Elara",
-      "avatar": "https://i.pravatar.cc/150?img=5",
-    },
-    {
-      "name": "Jordan",
-      "avatar": "https://i.pravatar.cc/150?img=6",
-    },
-  ];
+  Future<void> acceptRequest(String requestId, String senderId) async {
+    final batch = FirebaseFirestore.instance.batch();
 
-  void _markAllAsRead() {
-    setState(() {
-      _newRequestsCount = 0;
+    final requestRef = FirebaseFirestore.instance
+        .collection('friend_requests')
+        .doc(requestId);
+
+    final currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
+    final senderRef =
+    FirebaseFirestore.instance.collection('users').doc(senderId);
+    final receiverRef =
+    FirebaseFirestore.instance.collection('users').doc(currentUserId);
+
+    batch.update(requestRef, {'status': 'accepted'});
+    batch.update(senderRef, {
+      'friends': FieldValue.arrayUnion([currentUserId])
     });
-  }
-
-  void _acceptRequest(int index) {
-    setState(() {
-      receivedRequests.removeAt(index);
-      _newRequestsCount = receivedRequests.length;
+    batch.update(receiverRef, {
+      'friends': FieldValue.arrayUnion([senderId])
     });
+
+    await batch.commit();
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Request accepted'),
         backgroundColor: AppTheme.primaryBlue,
-        duration: Duration(seconds: 2),
       ),
     );
   }
 
-  void _declineRequest(int index) {
-    setState(() {
-      receivedRequests.removeAt(index);
-      _newRequestsCount = receivedRequests.length;
-    });
+  Future<void> declineRequest(String requestId) async {
+    await FirebaseFirestore.instance
+        .collection('friend_requests')
+        .doc(requestId)
+        .update({'status': 'declined'});
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Request declined'),
         backgroundColor: AppTheme.textGray,
-        duration: Duration(seconds: 2),
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -120,9 +88,17 @@ class _RequestsPageState extends State<RequestsPage>
             // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child:Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: AppTheme.textWhite,
+                      size: 18,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -144,16 +120,9 @@ class _RequestsPageState extends State<RequestsPage>
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(
-                      FontAwesomeIcons.gear,
-                      color: AppTheme.textWhite,
-                      size: 20,
-                    ),
-                    onPressed: () {},
-                  ),
                 ],
               ),
+
             ),
 
             // Search Bar
@@ -215,24 +184,37 @@ class _RequestsPageState extends State<RequestsPage>
                 padding: const EdgeInsets.all(4),
                 tabs: [
                   Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Received'),
-                        if (_newRequestsCount > 0) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ],
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('friend_requests')
+                          .where('receiverId', isEqualTo: currentUserId)
+                          .where('status', isEqualTo: 'pending')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final hasRequests =
+                            snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('Received'),
+                            if (hasRequests) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ),
+
                   const Tab(text: 'Sent'),
                 ],
               ),
@@ -265,82 +247,53 @@ class _RequestsPageState extends State<RequestsPage>
   }
 
   Widget _buildReceivedTab() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with Mark all read
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'NEW REQUESTS ($_newRequestsCount)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textGray,
-                    letterSpacing: 1,
-                  ),
-                ),
-                TextButton(
-                  onPressed: _markAllAsRead,
-                  child: const Text(
-                    'Mark all read',
-                    style: TextStyle(
-                      color: AppTheme.primaryBlue,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('friend_requests')
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('status', isEqualTo: 'pending')
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          const SizedBox(height: 12),
+        final requests = snapshot.data!.docs;
 
-          // Request Cards
-          ...List.generate(receivedRequests.length, (index) {
-            return _buildRequestCard(receivedRequests[index], index);
-          }),
-
-          const SizedBox(height: 32),
-
-          // Suggested Pingpals
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
+        if (requests.isEmpty) {
+          return const Center(
             child: Text(
-              'SUGGESTED PINGPALS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textGray,
-                letterSpacing: 1,
-              ),
+              'No new requests',
+              style: TextStyle(color: AppTheme.textGray),
             ),
-          ),
+          );
+        }
 
-          const SizedBox(height: 16),
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 24),
+          itemCount: requests.length,
+          itemBuilder: (context, index) {
+            final request = requests[index];
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: suggestedPingpals.map((pingpal) {
-                return _buildSuggestedCard(pingpal);
-              }).toList(),
-            ),
-          ),
+            return _buildRequestCard(
+              request: request,
+              showActions: true,
+            );
+          },
 
-          const SizedBox(height: 32),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildRequestCard(Map<String, dynamic> request, int index) {
+
+  Widget _buildRequestCard({
+    required QueryDocumentSnapshot request,
+    required bool showActions,
+  }) {
+    final avatar = request['senderPhoto'];
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -353,153 +306,89 @@ class _RequestsPageState extends State<RequestsPage>
         children: [
           Row(
             children: [
-              // Avatar with location badge
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundImage: NetworkImage(request["avatar"]),
-                  ),
-                  if (request["hasLocation"])
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryBlue,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          FontAwesomeIcons.locationDot,
-                          color: Colors.white,
-                          size: 10,
-                        ),
-                      ),
-                    ),
-                ],
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: AppTheme.primaryBlue.withOpacity(0.15),
+                backgroundImage:
+                avatar != null && avatar.toString().isNotEmpty
+                    ? NetworkImage(avatar)
+                    : null,
+                child: avatar == null || avatar.toString().isEmpty
+                    ? const Icon(
+                  Icons.person,
+                  color: AppTheme.primaryBlue,
+                )
+                    : null,
               ),
-
               const SizedBox(width: 12),
-
-              // User Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          request["name"],
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textWhite,
-                          ),
-                        ),
-                        if (request["verified"]) ...[
-                          const SizedBox(width: 4),
-                          const Icon(
-                            FontAwesomeIcons.circleCheck,
-                            color: AppTheme.primaryBlue,
-                            size: 16,
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 2),
                     Text(
-                      '${request["username"]} • Pinged ${request["time"]}',
+                      request['senderName'],
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textWhite,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      request['senderEmail'],
                       style: TextStyle(
                         fontSize: 13,
                         color: AppTheme.textGray.withOpacity(0.8),
                       ),
                     ),
-                    if (request["message"].isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        request["message"],
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textGray,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
-                    ),
-                    borderRadius: BorderRadius.circular(25),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryBlue.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+          if (showActions) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _acceptRequest(index),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(25),
                       ),
+                    ),
+                    onPressed: () => acceptRequest(
+                      request.id,
+                      request['senderId'],
                     ),
                     child: const Text(
                       'Accept',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
                       ),
                     ),
                   ),
+
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _declineRequest(index),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Colors.red, width: 1.5),
-                    backgroundColor: AppTheme.cardBackground,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                  ),
-                  child: const Text(
-                    'Decline',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red,
-                    ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => declineRequest(request.id),
+                    child: const Text('Decline'),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
+
 
   Widget _buildSuggestedCard(Map<String, dynamic> pingpal) {
     return Column(
@@ -552,33 +441,44 @@ class _RequestsPageState extends State<RequestsPage>
   }
 
   Widget _buildSentTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            FontAwesomeIcons.paperPlane,
-            size: 48,
-            color: AppTheme.textGray.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No sent requests',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppTheme.textGray,
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('friend_requests')
+          .where('senderId', isEqualTo: currentUserId)
+          .where('status', isEqualTo: 'pending')
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: AppTheme.primaryBlue,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Requests you send will appear here',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.textGray.withOpacity(0.7),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text(
+              'No sent requests',
+              style: TextStyle(color: AppTheme.textGray),
             ),
-          ),
-        ],
-      ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 24),
+          itemCount: snapshot.data!.docs.length,
+          itemBuilder: (context, index) {
+            final request = snapshot.data!.docs[index];
+            return _buildRequestCard(
+              request: request,
+              showActions: false,
+            );
+          },
+        );
+      },
     );
   }
+
 }
