@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'select_destination.dart';
@@ -12,57 +14,42 @@ class CreatePingtrailPage extends StatefulWidget {
 }
 
 class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
-  final int _navIndex = 0; // Pingtrail is at index 0
+  final int _navIndex = 0;
   final TextEditingController _trailNameController = TextEditingController(
     text: 'Friday Night Out',
   );
   final TextEditingController _searchController = TextEditingController();
 
-  // Sample friends data
-  final List<Map<String, dynamic>> suggestedFriends = [
-    {
-      "id": 1,
-      "name": "Jessica",
-      "avatar": "https://i.pravatar.cc/150?img=1",
-      "status": "Nearby • 1.2 mi away",
-      "online": true,
-      "selected": true,
-    },
-    {
-      "id": 2,
-      "name": "Sarah",
-      "avatar": "https://i.pravatar.cc/150?img=3",
-      "status": "Online now",
-      "online": true,
-      "selected": true,
-    },
-    {
-      "id": 3,
-      "name": "Mike",
-      "avatar": "https://i.pravatar.cc/150?img=2",
-      "status": "Moving • 12 mph",
-      "online": false,
-      "moving": true,
-      "selected": true,
-    },
-  ];
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-  int get selectedCount => suggestedFriends.where((f) => f["selected"]).length;
+  final TextEditingController destinationController = TextEditingController();
 
-  void _toggleSelection(int id) {
-    setState(() {
-      final friend = suggestedFriends.firstWhere((f) => f["id"] == id);
-      friend["selected"] = !friend["selected"];
+// selected pingpals (UIDs)
+  final Set<String> selectedPingpals = {};
+
+  bool isCreating = false;
+
+  Stream<List<DocumentSnapshot>> friendsStream() {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUserId)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final data = snapshot.data() as Map<String, dynamic>;
+      final List friends = data['friends'] ?? [];
+
+      if (friends.isEmpty) return [];
+
+      return Future.wait(
+        friends.map(
+              (id) =>
+              FirebaseFirestore.instance.collection('users').doc(id).get(),
+        ),
+      );
     });
   }
 
-  void _selectAll() {
-    setState(() {
-      for (var friend in suggestedFriends) {
-        friend["selected"] = true;
-      }
-    });
-  }
+
 
   @override
   void dispose() {
@@ -223,7 +210,8 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '$selectedCount Selected',
+                                '${selectedPingpals.length} / 5 Selected',
+
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -232,17 +220,6 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                               ),
                             ),
                           ],
-                        ),
-                        TextButton(
-                          onPressed: _selectAll,
-                          child: const Text(
-                            'Select All',
-                            style: TextStyle(
-                              color: AppTheme.primaryBlue,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
                         ),
                       ],
                     ),
@@ -294,9 +271,38 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                     const SizedBox(height: 12),
 
                     // Suggested Friends List
-                    ...suggestedFriends.map((friend) {
-                      return _buildFriendCard(friend);
-                    }),
+                    StreamBuilder<List<DocumentSnapshot>>(
+                      stream: friendsStream(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const CircularProgressIndicator();
+                        }
+
+                        final friends = snapshot.data!;
+
+                        if (friends.isEmpty) {
+                          return const Text(
+                            'No Pingpals yet',
+                            style: TextStyle(color: AppTheme.textGray),
+                          );
+                        }
+
+                        return Column(
+                          children: friends.map((doc) {
+                            final user = doc.data() as Map<String, dynamic>;
+                            final uid = doc.id;
+                            final isSelected = selectedPingpals.contains(uid);
+
+                            return _buildFirestoreFriendCard(
+                              uid: uid,
+                              user: user,
+                              isSelected: isSelected,
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+
 
                     const SizedBox(height: 24),
 
@@ -342,15 +348,14 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
               ],
             ),
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: selectedPingpals.length < 1 ? null:
+                () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => SelectDestinationPage(
                       trailName: _trailNameController.text,
-                      selectedFriends: suggestedFriends
-                          .where((f) => f["selected"])
-                          .toList(),
+                      selectedFriends: selectedPingpals.toList(),
                     ),
                   ),
                 );
@@ -414,13 +419,23 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
     );
   }
 
-  Widget _buildFriendCard(Map<String, dynamic> friend) {
-    final bool isSelected = friend["selected"];
-    final bool isOnline = friend["online"] ?? false;
-    final bool isMoving = friend["moving"] ?? false;
-
+  Widget _buildFirestoreFriendCard({
+    required String uid,
+    required Map<String, dynamic> user,
+    required bool isSelected,
+  }) {
     return GestureDetector(
-      onTap: () => _toggleSelection(friend["id"]),
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            selectedPingpals.remove(uid);
+          } else {
+            if (selectedPingpals.length < 5) {
+              selectedPingpals.add(uid);
+            }
+          }
+        });
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -434,43 +449,25 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
         ),
         child: Row(
           children: [
-            // Avatar with status indicator
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: NetworkImage(friend["avatar"]),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: isOnline
-                          ? Colors.green
-                          : (isMoving ? Colors.orange : Colors.grey),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppTheme.cardBackground,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: AppTheme.primaryBlue.withOpacity(0.15),
+              backgroundImage: user['photoUrl'] != null &&
+                  user['photoUrl'].toString().isNotEmpty
+                  ? NetworkImage(user['photoUrl'])
+                  : null,
+              child: user['photoUrl'] == null ||
+                  user['photoUrl'].toString().isEmpty
+                  ? const Icon(Icons.person, color: AppTheme.primaryBlue)
+                  : null,
             ),
-
             const SizedBox(width: 12),
-
-            // Friend Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    friend["name"],
+                    user['fullName'],
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
@@ -479,7 +476,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    friend["status"],
+                    user['email'],
                     style: TextStyle(
                       fontSize: 13,
                       color: AppTheme.textGray.withOpacity(0.8),
@@ -488,32 +485,15 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                 ],
               ),
             ),
-
-            // Checkmark
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: isSelected ? AppTheme.primaryBlue : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected
-                      ? AppTheme.primaryBlue
-                      : AppTheme.borderColor,
-                  width: 2,
-                ),
+            if (isSelected)
+              const Icon(
+                FontAwesomeIcons.check,
+                color: AppTheme.primaryBlue,
               ),
-              child: isSelected
-                  ? const Icon(
-                      FontAwesomeIcons.check,
-                      color: Colors.white,
-                      size: 16,
-                    )
-                  : null,
-            ),
           ],
         ),
       ),
     );
   }
+
 }

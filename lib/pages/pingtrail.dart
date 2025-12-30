@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'create_pingtrail.dart';
@@ -15,33 +18,60 @@ class PingtrailPage extends StatefulWidget {
 }
 
 class _PingtrailPageState extends State<PingtrailPage> {
-  final int _navIndex = 0; // Pingtrail is at index 0 (correct)
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+  final int _navIndex = 0;
 
-  // Sample data for active pingtrail
-  final Map<String, dynamic>? activePingtrail = {
-    "title": "Road Trip to Vegas",
-    "timeRemaining": "120mi remaining",
-    "duration": "2h 14m",
-    "progress": 0.45,
-    "participants": [
-      "https://i.pravatar.cc/150?img=1",
-      "https://i.pravatar.cc/150?img=2",
-      "https://i.pravatar.cc/150?img=3",
-    ],
-    "additionalCount": 2,
-  };
+  // Select Destination
+  void validateSelectedDestination(LatLng? selectedLatLng) {
+    if (selectedLatLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a destination on the map'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+  }
 
-  // Sample data for past pingtrails
-  final List<Map<String, dynamic>> pastPingtrails = [
-    {
-      "title": "Downtown Meetup",
-      "endedTime": "15 mins ago",
-      "participants": [
-        "https://i.pravatar.cc/150?img=4",
-        "https://i.pravatar.cc/150?img=5",
-      ],
-    },
-  ];
+  // Accept Pingtrail
+  Future<void> acceptPingtrail(String pingtrailId) async {
+    final uid = currentUserId;
+    final ref =
+    FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data()!;
+
+      final members = List<String>.from(data['members']);
+      final accepted = List<String>.from(data['acceptedMembers']);
+
+      if (!accepted.contains(uid)) {
+        accepted.add(uid);
+      }
+
+      final everyoneAccepted = accepted.length == members.length;
+
+      tx.update(ref, {
+        'acceptedMembers': accepted,
+        'status': everyoneAccepted ? 'active' : 'pending',
+        'startedAt':
+        everyoneAccepted ? FieldValue.serverTimestamp() : null,
+      });
+    });
+  }
+
+  // Decline Pingtrail
+  Future<void> declinePingtrail(String pingtrailId) async {
+    await FirebaseFirestore.instance
+        .collection('pingtrails')
+        .doc(pingtrailId)
+        .update({
+      'members': FieldValue.arrayRemove([currentUserId]),
+      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -189,12 +219,100 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 const SizedBox(height: 16),
 
-                if (activePingtrail != null)
-                  _buildActivePingtrailCard(activePingtrail!)
-                else
-                  _buildNoActivePingtrail(),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('pingtrails')
+                      .where('members', arrayContains: currentUserId)
+                      .where('status', isEqualTo: 'active')
+                      .limit(1)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.data!.docs.isEmpty) {
+                      return _buildNoActivePingtrail();
+                    }
+
+                    final trail = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+                    return _buildActivePingtrailCard(trail);
+                  },
+                ),
+
+                // Pending Pingtrails Section
+                const Text(
+                  'Pending Pingtrails',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textWhite,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                _buildPendingPingtrails(),
 
                 const SizedBox(height: 40),
+
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('pingtrails')
+                      .where('hostId', isEqualTo: currentUserId)
+                      .where('status', isEqualTo: 'pending')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const SizedBox();
+                    }
+
+                    return Column(
+                      children: snapshot.data!.docs.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.cardBackground,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppTheme.borderColor),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Your Pingtrail',
+                                style: TextStyle(
+                                  color: AppTheme.textGray,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                data['name'],
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textWhite,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Waiting for pingpals to accept…',
+                                style: TextStyle(
+                                  color: AppTheme.textGray.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+
 
                 // Past Pingtrails Section
                 const Text(
@@ -209,7 +327,30 @@ class _PingtrailPageState extends State<PingtrailPage> {
                 const SizedBox(height: 16),
 
                 // Past Pingtrail Cards
-                ...pastPingtrails.map((trail) => _buildPastPingtrailCard(trail)),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('pingtrails')
+                      .where('members', arrayContains: currentUserId)
+                      .where('status', isEqualTo: 'completed')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Text(
+                        'No past pingtrails',
+                        style: TextStyle(color: AppTheme.textGray),
+                      );
+                    }
+
+                    return Column(
+                      children: snapshot.data!.docs.map((doc) {
+                        final trail = doc.data() as Map<String, dynamic>;
+                        return _buildPastPingtrailCard(trail);
+                      }).toList(),
+                    );
+                  },
+                ),
+
 
                 const SizedBox(height: 24),
 
@@ -372,7 +513,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                     Row(
                       children: [
                         ...List.generate(
-                          trail["participants"].length.clamp(0, 2),
+                          trail["participants"].length.clamp(0, 1),
                           (index) => Padding(
                             padding: EdgeInsets.only(left: index > 0 ? 4 : 0),
                             child: CircleAvatar(
@@ -409,7 +550,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 // Trail title
                 Text(
-                  trail["title"],
+                  trail["destinationName"],
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
@@ -529,6 +670,160 @@ class _PingtrailPageState extends State<PingtrailPage> {
       ),
     );
   }
+
+  Widget _buildPendingPingtrails() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('pingtrails')
+          .where('members', arrayContains: currentUserId)
+          .where('status', isEqualTo: 'pending')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data!.docs;
+
+        final pendingInvites = docs.where((doc) {
+          final accepted =
+          List<String>.from(doc['acceptedMembers']);
+          return !accepted.contains(currentUserId);
+        }).toList();
+
+        if (pendingInvites.isEmpty) {
+          return const Text(
+            'No pending pingtrail invites',
+            style: TextStyle(color: AppTheme.textGray),
+          );
+        }
+
+        return Column(
+          children: pendingInvites
+              .map((doc) => _buildPendingPingtrailCard(doc))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildPendingPingtrailCard(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final members = List<String>.from(data['members'] ?? []);
+    final accepted = List<String>.from(data['acceptedMembers'] ?? []);
+    final isHost = data['hostId'] == currentUserId;
+
+    final acceptedCount = accepted.length;
+    final totalCount = members.length;
+    final hasAccepted = accepted.contains(currentUserId);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          Text(
+            data['name'] ?? 'Pingtrail',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textWhite,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // Destination
+          Text(
+            'Destination: ${data['destination']['name']}',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.textGray.withOpacity(0.8),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Accepted count
+          Text(
+            '$acceptedCount / $totalCount pingpals accepted',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryBlue,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Status row
+          Row(
+            children: [
+              Icon(
+                hasAccepted ? Icons.check_circle : Icons.hourglass_top,
+                size: 16,
+                color: hasAccepted ? Colors.green : Colors.orange,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                hasAccepted ? 'You accepted' : 'Waiting for your response',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: hasAccepted ? Colors.green : Colors.orange,
+                ),
+              ),
+            ],
+          ),
+
+          // Actions (only if NOT host and NOT accepted)
+          if (!isHost && !hasAccepted) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => acceptPingtrail(doc.id),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Accept'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => declinePingtrail(doc.id),
+                    child: const Text('Decline'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          // Host message
+          if (isHost) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Waiting for pingpals to accept…',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textGray,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildNoActivePingtrail() {
     return Container(
