@@ -517,7 +517,7 @@ class _PingpalsPageState extends State<PingpalsPage> {
                       : null,
                 ),
 
-                if (pingpal["isOnline"])
+                if (pingpal["isOnline"] == true)
                   Positioned(
                     bottom: 0,
                     right: 0,

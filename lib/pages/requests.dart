@@ -32,36 +32,47 @@ class _RequestsPageState extends State<RequestsPage>
 
 
   Future<void> acceptRequest(String requestId, String senderId) async {
-    final batch = FirebaseFirestore.instance.batch();
-
-    final requestRef = FirebaseFirestore.instance
-        .collection('friend_requests')
-        .doc(requestId);
-
+    final firestore = FirebaseFirestore.instance;
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-    final senderRef =
-    FirebaseFirestore.instance.collection('users').doc(senderId);
-    final receiverRef =
-    FirebaseFirestore.instance.collection('users').doc(currentUserId);
+    final requestRef =
+    firestore.collection('friend_requests').doc(requestId);
 
+    final senderRef = firestore.collection('users').doc(senderId);
+    final receiverRef = firestore.collection('users').doc(currentUserId);
+
+    final batch = firestore.batch();
+
+    // Mark request as accepted
     batch.update(requestRef, {'status': 'accepted'});
-    batch.update(senderRef, {
-      'friends': FieldValue.arrayUnion([currentUserId])
-    });
-    batch.update(receiverRef, {
-      'friends': FieldValue.arrayUnion([senderId])
-    });
+
+    // Create / update friends array safely
+    batch.set(
+      senderRef,
+      {
+        'friends': FieldValue.arrayUnion([currentUserId]),
+      },
+      SetOptions(merge: true),
+    );
+
+    batch.set(
+      receiverRef,
+      {
+        'friends': FieldValue.arrayUnion([senderId]),
+      },
+      SetOptions(merge: true),
+    );
 
     await batch.commit();
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Request accepted'),
+        content: Text('Pingpal added 🎉'),
         backgroundColor: AppTheme.primaryBlue,
       ),
     );
   }
+
 
   Future<void> declineRequest(String requestId) async {
     await FirebaseFirestore.instance
