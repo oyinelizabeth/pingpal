@@ -4,7 +4,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'pingtrail_complete.dart';
-import 'dart:async';
 
 class SelectDestinationPage extends StatefulWidget {
   final String trailName;

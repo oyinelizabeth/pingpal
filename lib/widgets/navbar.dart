@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
-import '../pages/settings.dart';
-import '../pages/chat_list.dart';
-import '../pages/pingpals.dart';
 
 class NavBar extends StatelessWidget {
   final int currentIndex;
@@ -47,14 +44,7 @@ class NavBar extends StatelessWidget {
               ),
               // Pingpals
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PingpalsPage(),
-                    ),
-                  );
-                },
+                onTap: () => onTap(1),
                 child: _buildNavItem(
                   icon: FontAwesomeIcons.users,
                   label: 'Pingpals',
@@ -65,14 +55,7 @@ class NavBar extends StatelessWidget {
               _buildCenterMapButton(),
               // Chat
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ChatListPage(),
-                    ),
-                  );
-                },
+                onTap: () => onTap(3),
                 child: _buildNavItem(
                   icon: FontAwesomeIcons.message,
                   label: 'Chat',
@@ -81,14 +64,7 @@ class NavBar extends StatelessWidget {
               ),
               // Settings (Note: Settings page doesn't have navbar, so index doesn't matter)
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SettingsPage(),
-                    ),
-                  );
-                },
+                onTap: () => onTap(4),
                 child: _buildNavItem(
                   icon: FontAwesomeIcons.gear,
                   label: 'Settings',

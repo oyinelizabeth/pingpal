@@ -1,9 +1,14 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:pingpal/pages/delete_account_page.dart';
+import 'package:pingpal/pages/welcome_page.dart';
+
 import '../theme/app_theme.dart';
-import 'edit_profile.dart';
-import 'change_password.dart';
+import '../utils/utils.dart';
 import 'blocked_pingpals.dart';
+import 'change_password.dart';
+import 'edit_profile.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -258,13 +263,17 @@ class _SettingsPageState extends State<SettingsPage> {
                       icon: FontAwesomeIcons.fileContract,
                       iconColor: Colors.grey,
                       title: 'Terms of Service',
-                      onTap: () {},
+                      onTap: () {
+                        Utils.openLink('https://pingpal.co.za/terms-of-use');
+                      },
                     ),
                     _buildNavigationTile(
                       icon: FontAwesomeIcons.shieldHalved,
                       iconColor: Colors.grey,
                       title: 'Privacy Policy',
-                      onTap: () {},
+                      onTap: () {
+                        Utils.openLink('https://pingpal.co.za/privacy-policy');
+                      },
                     ),
 
                     const SizedBox(height: 32),
@@ -444,7 +453,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: AppTheme.primaryBlue,
+              activeThumbColor: AppTheme.primaryBlue,
               activeTrackColor: AppTheme.primaryBlue.withOpacity(0.5),
               inactiveThumbColor: AppTheme.textGray,
               inactiveTrackColor: AppTheme.textGray.withOpacity(0.3),
@@ -483,10 +492,15 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: Implement logout logic
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              await FirebaseAuth.instance.signOut();
+              if (!context.mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const WelcomePage()),
+                    (route) => false,
+              );
             },
             child: const Text(
               'Log Out',
@@ -528,7 +542,11 @@ class _SettingsPageState extends State<SettingsPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              // TODO: Implement delete account logic
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const DeleteAccountPage()),
+              );
             },
             child: const Text(
               'Delete',

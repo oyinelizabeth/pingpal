@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-
+import 'package:flutter/material.dart';
 import 'package:pingpal/pages/welcome_page.dart';
+
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -18,9 +18,7 @@ class PingPalApp extends StatelessWidget {
     return MaterialApp(
       title: 'PingPal',
       debugShowCheckedModeBanner: false,
-
-          theme: AppTheme.darkTheme,
-
+      theme: AppTheme.darkTheme,
       home: const WelcomePage(),
     );
   }

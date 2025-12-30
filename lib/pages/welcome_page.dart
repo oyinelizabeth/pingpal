@@ -1,7 +1,10 @@
+ import 'dart:math' as math;
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'dart:math' as math;
-import '../theme/app_theme.dart';
+import 'package:pingpal/pages/home.dart';
+
 import 'auth_page.dart';
 
 class WelcomePage extends StatefulWidget {
@@ -22,6 +25,26 @@ class _WelcomePageState extends State<WelcomePage>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    // Add a short delay for splash animation
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    // Schedule navigation after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (user != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+        );
+      }
+    });
   }
 
   @override
@@ -518,5 +541,6 @@ class RadarPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(RadarPainter oldDelegate) => progress != oldDelegate.progress;
+  bool shouldRepaint(RadarPainter oldDelegate) =>
+      progress != oldDelegate.progress;
 }

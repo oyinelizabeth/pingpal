@@ -1,6 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:pingpal/pages/forget_password.dart';
+import 'package:pingpal/pages/welcome_page.dart';
+
 import '../theme/app_theme.dart';
+import 'auth_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -10,15 +15,16 @@ class ChangePasswordPage extends StatefulWidget {
 }
 
 class _ChangePasswordPageState extends State<ChangePasswordPage> {
-  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
 
-  // Password requirements
   bool _hasMinLength = false;
   bool _hasSpecialChar = false;
   bool _hasNumber = false;
@@ -46,7 +52,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     });
   }
 
-  void _savePassword() {
+  Future<void> _savePassword() async {
     if (_currentPasswordController.text.isEmpty) {
       _showError('Please enter your current password');
       return;
@@ -64,14 +70,40 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
-    // TODO: Implement password change logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password changed successfully'),
-        backgroundColor: AppTheme.primaryBlue,
-      ),
-    );
-    Navigator.pop(context);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null || user.email == null) {
+        _showError('User not logged in');
+        return;
+      }
+
+      // Re-authenticate
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: _currentPasswordController.text,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+
+      // Update password
+      await user.updatePassword(_newPasswordController.text);
+
+      await FirebaseAuth.instance.signOut();
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const WelcomePage()),
+        (route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password changed successfully'),
+          backgroundColor: AppTheme.primaryBlue,
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      _showError(e.message ?? 'Password change failed');
+    }
   }
 
   void _showError(String message) {
@@ -90,7 +122,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -118,14 +149,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 ],
               ),
             ),
-
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header Text
                     const Text(
                       'Secure your account',
                       style: TextStyle(
@@ -143,10 +172,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         height: 1.4,
                       ),
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Current Password
                     const Text(
                       'Current Password',
                       style: TextStyle(
@@ -156,73 +182,33 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextField(
+                    _passwordField(
                       controller: _currentPasswordController,
-                      obscureText: _obscureCurrentPassword,
-                      style: const TextStyle(color: AppTheme.textWhite),
-                      decoration: InputDecoration(
-                        hintText: 'Enter current password',
-                        hintStyle: TextStyle(
-                          color: AppTheme.textGray.withOpacity(0.5),
-                        ),
-                        filled: true,
-                        fillColor: AppTheme.cardBackground,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppTheme.borderColor),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppTheme.borderColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppTheme.primaryBlue,
-                            width: 2,
-                          ),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureCurrentPassword
-                                ? FontAwesomeIcons.eyeSlash
-                                : FontAwesomeIcons.eye,
-                            size: 18,
-                            color: AppTheme.textGray,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureCurrentPassword = !_obscureCurrentPassword;
-                            });
-                          },
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
+                      obscure: _obscureCurrentPassword,
+                      toggle: () => setState(() {
+                        _obscureCurrentPassword = !_obscureCurrentPassword;
+                      }),
+                      hint: 'Enter current password',
                     ),
-
-                    const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {
-                          // TODO: Implement forgot password
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordPage()),
+                          );
                         },
                         child: const Text(
                           'Forgot Password?',
                           style: TextStyle(
                             color: AppTheme.primaryBlue,
-                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 24),
-
-                    // New Password
                     const Text(
                       'New Password',
                       style: TextStyle(
@@ -232,56 +218,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextField(
+                    _passwordField(
                       controller: _newPasswordController,
-                      obscureText: _obscureNewPassword,
-                      style: const TextStyle(color: AppTheme.textWhite),
-                      decoration: InputDecoration(
-                        hintText: 'Enter new password',
-                        hintStyle: TextStyle(
-                          color: AppTheme.textGray.withOpacity(0.5),
-                        ),
-                        filled: true,
-                        fillColor: AppTheme.cardBackground,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppTheme.borderColor),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppTheme.borderColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppTheme.primaryBlue,
-                            width: 2,
-                          ),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureNewPassword
-                                ? FontAwesomeIcons.eyeSlash
-                                : FontAwesomeIcons.eye,
-                            size: 18,
-                            color: AppTheme.textGray,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureNewPassword = !_obscureNewPassword;
-                            });
-                          },
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
+                      obscure: _obscureNewPassword,
+                      toggle: () => setState(() {
+                        _obscureNewPassword = !_obscureNewPassword;
+                      }),
+                      hint: 'Enter new password',
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Confirm New Password
                     const Text(
                       'Confirm New Password',
                       style: TextStyle(
@@ -291,86 +236,20 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextField(
+                    _passwordField(
                       controller: _confirmPasswordController,
-                      obscureText: _obscureConfirmPassword,
-                      style: const TextStyle(color: AppTheme.textWhite),
-                      decoration: InputDecoration(
-                        hintText: 'Re-enter new password',
-                        hintStyle: TextStyle(
-                          color: AppTheme.textGray.withOpacity(0.5),
-                        ),
-                        filled: true,
-                        fillColor: AppTheme.cardBackground,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppTheme.borderColor),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppTheme.borderColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppTheme.primaryBlue,
-                            width: 2,
-                          ),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword
-                                ? FontAwesomeIcons.eyeSlash
-                                : FontAwesomeIcons.eye,
-                            size: 18,
-                            color: AppTheme.textGray,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
-                            });
-                          },
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
+                      obscure: _obscureConfirmPassword,
+                      toggle: () => setState(() {
+                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                      }),
+                      hint: 'Re-enter new password',
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Requirements
-                    Text(
-                      'REQUIREMENTS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textGray.withOpacity(0.6),
-                        letterSpacing: 1,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
+                    _buildRequirement('At least 8 characters', _hasMinLength),
                     _buildRequirement(
-                      'At least 8 characters',
-                      _hasMinLength,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRequirement(
-                      'Includes a special character',
-                      _hasSpecialChar,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRequirement(
-                      'Includes a number',
-                      _hasNumber,
-                    ),
-
+                        'Includes a special character', _hasSpecialChar),
+                    _buildRequirement('Includes a number', _hasNumber),
                     const SizedBox(height: 32),
-
-                    // Save Button
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
@@ -416,40 +295,50 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     );
   }
 
+  Widget _passwordField({
+    required TextEditingController controller,
+    required bool obscure,
+    required VoidCallback toggle,
+    required String hint,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      style: const TextStyle(color: AppTheme.textWhite),
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: AppTheme.cardBackground,
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscure ? FontAwesomeIcons.eyeSlash : FontAwesomeIcons.eye,
+            size: 18,
+          ),
+          onPressed: toggle,
+        ),
+      ),
+    );
+  }
+
   Widget _buildRequirement(String text, bool met) {
-    return Row(
-      children: [
-        Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            color: met ? Colors.green : AppTheme.inputBackground,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: met ? Colors.green : AppTheme.borderColor,
-              width: 2,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(
+            met ? FontAwesomeIcons.checkCircle : FontAwesomeIcons.circle,
+            size: 14,
+            color: met ? Colors.green : AppTheme.textGray,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              color: met ? AppTheme.textWhite : AppTheme.textGray,
             ),
           ),
-          child: met
-              ? const Icon(
-                  FontAwesomeIcons.check,
-                  size: 10,
-                  color: Colors.white,
-                )
-              : null,
-        ),
-        const SizedBox(width: 12),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 15,
-            color: met
-                ? AppTheme.textWhite
-                : AppTheme.textGray.withOpacity(0.7),
-            fontWeight: met ? FontWeight.w500 : FontWeight.w400,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
