@@ -29,6 +29,8 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
 
   bool isCreating = false;
 
+
+
   Stream<List<DocumentSnapshot>> friendsStream() {
     return FirebaseFirestore.instance
         .collection('users')
@@ -49,6 +51,10 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
     });
   }
 
+  @override
+  void initState() {
+    super.initState();
+  }
 
 
   @override
@@ -57,6 +63,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
     _searchController.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {

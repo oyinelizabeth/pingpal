@@ -9,6 +9,8 @@ import 'create_pingtrail.dart';
 import 'pingtrails_history.dart';
 import 'pingpals.dart';
 import 'chat_list.dart';
+import '../widgets/pending_pingtrail_sheet.dart';
+
 
 class PingtrailPage extends StatefulWidget {
   const PingtrailPage({super.key});
@@ -72,6 +74,26 @@ class _PingtrailPageState extends State<PingtrailPage> {
       'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
     });
   }
+
+  // Popup for pending pingtrail
+  void _openPendingPingtrailPopup(QueryDocumentSnapshot doc) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.darkBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => PendingPingtrailDetailsSheet(
+        doc: doc,
+        currentUserId: currentUserId,
+        onAccept: () => acceptPingtrail(doc.id),
+        onDecline: () => declinePingtrail(doc.id),
+      ),
+    );
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -712,114 +734,90 @@ class _PingtrailPageState extends State<PingtrailPage> {
     final members = List<String>.from(data['members'] ?? []);
     final accepted = List<String>.from(data['acceptedMembers'] ?? []);
     final isHost = data['hostId'] == currentUserId;
-
-    final acceptedCount = accepted.length;
-    final totalCount = members.length;
     final hasAccepted = accepted.contains(currentUserId);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title
-          Text(
-            data['name'] ?? 'Pingtrail',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textWhite,
-            ),
+        onTap: () {
+          debugPrint('Pending pingtrail tapped: ${doc.id}');
+          _openPendingPingtrailPopup(doc);
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.cardBackground,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.borderColor),
           ),
-
-          const SizedBox(height: 4),
-
-          // Destination
-          Text(
-            'Destination: ${data['destination']['name']}',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.textGray.withOpacity(0.8),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Accepted count
-          Text(
-            '$acceptedCount / $totalCount pingpals accepted',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.primaryBlue,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Status row
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                hasAccepted ? Icons.check_circle : Icons.hourglass_top,
-                size: 16,
-                color: hasAccepted ? Colors.green : Colors.orange,
-              ),
-              const SizedBox(width: 6),
               Text(
-                hasAccepted ? 'You accepted' : 'Waiting for your response',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: hasAccepted ? Colors.green : Colors.orange,
+                data['name'] ?? 'Pingtrail',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textWhite,
                 ),
               ),
-            ],
-          ),
 
-          // Actions (only if NOT host and NOT accepted)
-          if (!isHost && !hasAccepted) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => acceptPingtrail(doc.id),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: const Text('Accept'),
-                  ),
+              const SizedBox(height: 6),
+
+              Text(
+                "Destination: ${data['destinationName']}",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textGray.withOpacity(0.8),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => declinePingtrail(doc.id),
-                    child: const Text('Decline'),
+              ),
+
+              const SizedBox(height: 10),
+
+              Text(
+                '${accepted.length} / ${members.length} pingpals accepted',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  Icon(
+                    hasAccepted ? Icons.check_circle : Icons.hourglass_top,
+                    size: 16,
+                    color: hasAccepted ? Colors.green : Colors.orange,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    hasAccepted ? 'You accepted' : 'Tap to view invite',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: hasAccepted ? Colors.green : Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+
+              if (isHost) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Waiting for pingpals to accept…',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textGray,
                   ),
                 ),
               ],
-            ),
-          ],
-
-          // Host message
-          if (isHost) ...[
-            const SizedBox(height: 12),
-            const Text(
-              'Waiting for pingpals to accept…',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppTheme.textGray,
-              ),
-            ),
-          ],
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

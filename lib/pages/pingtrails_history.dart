@@ -3,6 +3,9 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'pingtrail_complete.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class PingtrailsHistoryPage extends StatefulWidget {
   const PingtrailsHistoryPage({super.key});
@@ -16,86 +19,63 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   late TabController _tabController;
   final int _navIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+  final Map<String, String> _userNameCache = {};
 
-  // Sample completed pingtrails data
-  final List<Map<String, dynamic>> completedTrails = [
-    {
-      "title": "Roadtrip to Vegas",
-      "destination": "Las Vegas Strip, NV",
-      "date": "Oct 12",
-      "duration": "2h 15m",
-      "participants": [
-        "https://i.pravatar.cc/150?img=1",
-        "https://i.pravatar.cc/150?img=2",
-        "https://i.pravatar.cc/150?img=3",
-      ],
-      "additionalCount": 2,
-      "thumbnail": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400",
-      "completed": true,
-    },
-    {
-      "title": "Friday Night Dinner",
-      "destination": "123 Sushi Lane,...",
-      "date": "Nov 14",
-      "duration": "45m",
-      "participants": [
-        "https://i.pravatar.cc/150?img=4",
-        "https://i.pravatar.cc/150?img=5",
-      ],
-      "additionalCount": 0,
-      "thumbnail": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400",
-      "completed": true,
-    },
-    {
-      "title": "Morning Hike",
-      "destination": "Blue Ridge Trailhead",
-      "date": "Yesterday",
-      "duration": "3h 10m",
-      "participants": [
-        "https://i.pravatar.cc/150?img=6",
-        "https://i.pravatar.cc/150?img=7",
-        "https://i.pravatar.cc/150?img=8",
-      ],
-      "additionalCount": 0,
-      "thumbnail": "https://images.unsplash.com/photo-1551632811-561732d1e306?w=400",
-      "completed": true,
-    },
-    {
-      "title": "Stadium Concert",
-      "destination": "City Arena, Gate 4",
-      "date": "Last Week",
-      "duration": "55m",
-      "participants": [
-        "https://i.pravatar.cc/150?img=9",
-      ],
-      "additionalCount": 4,
-      "thumbnail": "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400",
-      "completed": true,
-    },
-  ];
+  Future<void> _loadUserNames(List<String> userIds) async {
+    final missingIds = userIds.where((id) => !_userNameCache.containsKey(id)).toList();
+    if (missingIds.isEmpty) return;
 
-  // Sample cancelled pingtrails data
-  final List<Map<String, dynamic>> cancelledTrails = [
-    {
-      "title": "Beach Day",
-      "destination": "Santa Monica Pier",
-      "date": "2 weeks ago",
-      "duration": "N/A",
-      "participants": [
-        "https://i.pravatar.cc/150?img=10",
-        "https://i.pravatar.cc/150?img=11",
-      ],
-      "additionalCount": 1,
-      "thumbnail": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400",
-      "completed": false,
-    },
-  ];
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: missingIds.take(10).toList())
+        .get();
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      _userNameCache[doc.id] = (data['name'] ?? '').toString().toLowerCase();
+    }
+  }
+
+  bool _matchesSearch(Map<String, dynamic> data) {
+    final query = _searchController.text.toLowerCase().trim();
+    if (query.isEmpty) return true;
+
+    final trailName = (data['name'] ?? '').toString().toLowerCase();
+    final destination =
+    (data['destination']?['name'] ?? '').toString().toLowerCase();
+
+    // Basic checks
+    if (trailName.contains(query) || destination.contains(query)) {
+      return true;
+    }
+
+    // Member name check
+    final members = List<String>.from(data['members'] ?? []);
+    _loadUserNames(members);
+
+    for (final uid in members) {
+      final name = _userNameCache[uid];
+      if (name != null && name.contains(query)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    _searchController.addListener(() {
+      setState(() {});
+    });
   }
+
 
   @override
   void dispose() {
@@ -104,39 +84,19 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
     super.dispose();
   }
 
-  void _openTrailDetails(Map<String, dynamic> trail) {
+
+  void _openTrailDetailsFromDoc(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PingtrailCompletePage(
-          trailName: trail["title"],
-          destination: trail["destination"],
-          duration: trail["duration"],
-          distance: '3.2 km',
-          participants: const [
-            {
-              "name": "You",
-              "avatar": "https://i.pravatar.cc/150?img=8",
-              "arrivalTime": "20:12",
-              "timeDiff": "+0m",
-              "isHost": true,
-              "arrived": true,
-            },
-            {
-              "name": "Sarah",
-              "avatar": "https://i.pravatar.cc/150?img=3",
-              "arrivalTime": "20:15",
-              "timeDiff": "+3m",
-              "arrived": true,
-            },
-            {
-              "name": "Mike",
-              "avatar": "https://i.pravatar.cc/150?img=2",
-              "arrivalTime": "20:18",
-              "timeDiff": "+6m",
-              "arrived": true,
-            },
-          ],
+          trailName: data['name'],
+          destination: data['destination']?['name'] ?? '',
+          duration: data['duration'] ?? '',
+          distance: data['distance'] ?? '',
+          participants: const [], // we’ll make this dynamic next
         ),
       ),
     );
@@ -266,28 +226,120 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   }
 
   Widget _buildCompletedTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      itemCount: completedTrails.length,
-      itemBuilder: (context, index) {
-        return _buildTrailCard(completedTrails[index], true);
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('pingtrails')
+          .where('members', arrayContains: currentUserId)
+          .where('status', isEqualTo: 'completed')
+          .orderBy('endedAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final filteredDocs = snapshot.data!.docs.where((doc) {
+          return _matchesSearch(doc.data() as Map<String, dynamic>);
+        }).toList();
+
+        if (filteredDocs.isEmpty) {
+          return _buildEmptyState(
+            _searchController.text.isNotEmpty
+                ? 'No matching pingtrails'
+                : 'No completed pingtrails',
+          );
+        }
+
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          children: filteredDocs
+              .map((doc) => _buildTrailCardFromDoc(doc, true))
+              .toList(),
+        );
       },
     );
   }
+
 
   Widget _buildCancelledTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      itemCount: cancelledTrails.length,
-      itemBuilder: (context, index) {
-        return _buildTrailCard(cancelledTrails[index], false);
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('pingtrails')
+          .where('members', arrayContains: currentUserId)
+          .where('status', isEqualTo: 'cancelled')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final filteredDocs = snapshot.data!.docs.where((doc) {
+          return _matchesSearch(doc.data() as Map<String, dynamic>);
+        }).toList();
+
+        if (filteredDocs.isEmpty) {
+          return _buildEmptyState(
+            _searchController.text.isNotEmpty
+                ? 'No matching pingtrails'
+                : 'No cancelled pingtrails',
+          );
+        }
+
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          children: filteredDocs
+              .map((doc) => _buildTrailCardFromDoc(doc, false))
+              .toList(),
+        );
       },
     );
   }
 
-  Widget _buildTrailCard(Map<String, dynamic> trail, bool isCompleted) {
+  Widget _buildEmptyState(String message) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: Center(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: AppTheme.textGray,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
+  Widget _buildTrailCardFromDoc(QueryDocumentSnapshot doc, bool isCompleted) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    final title = data['name'] ?? 'Pingtrail';
+    final destination = data['destination']?['name'] ?? 'Unknown destination';
+    final members = List<String>.from(data['members'] ?? []);
+    final endedAt = data['endedAt'] as Timestamp?;
+    final createdAt = data['createdAt'] as Timestamp?;
+
+    final date = isCompleted && endedAt != null
+        ? _formatDate(endedAt.toDate())
+        : createdAt != null
+        ? _formatDate(createdAt.toDate())
+        : '';
+
     return GestureDetector(
-      onTap: isCompleted ? () => _openTrailDetails(trail) : null,
+      onTap: isCompleted
+          ? () => _openTrailDetailsFromDoc(doc)
+          : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -297,42 +349,34 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
         ),
         child: Row(
           children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                bottomLeft: Radius.circular(20),
-              ),
-              child: Container(
-                width: 100,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: AppTheme.inputBackground,
-                  image: DecorationImage(
-                    image: NetworkImage(trail["thumbnail"]),
-                    fit: BoxFit.cover,
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.3),
-                      BlendMode.darken,
-                    ),
-                  ),
+            // Thumbnail placeholder
+            Container(
+              width: 100,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppTheme.inputBackground,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
                 ),
+              ),
+              child: Icon(
+                FontAwesomeIcons.route,
+                color: AppTheme.textGray.withOpacity(0.4),
               ),
             ),
 
-            // Content
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title and Status
                     Row(
                       children: [
                         Expanded(
                           child: Text(
-                            trail["title"],
+                            title,
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -352,20 +396,19 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
 
                     const SizedBox(height: 8),
 
-                    // Destination
                     Row(
                       children: [
                         Icon(
                           FontAwesomeIcons.locationDot,
+                          size: 12,
                           color: isCompleted
                               ? AppTheme.primaryBlue
                               : Colors.red,
-                          size: 12,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            trail["destination"],
+                            destination,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppTheme.textGray.withOpacity(0.8),
@@ -378,78 +421,21 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
 
                     const SizedBox(height: 12),
 
-                    // Participants
-                    Row(
-                      children: [
-                        ...List.generate(
-                          trail["participants"].length.clamp(0, 3),
-                          (index) => Container(
-                            margin: EdgeInsets.only(left: index > 0 ? 4 : 0),
-                            child: CircleAvatar(
-                              radius: 12,
-                              backgroundColor: AppTheme.cardBackground,
-                              backgroundImage: NetworkImage(
-                                trail["participants"][index],
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (trail["additionalCount"] > 0)
-                          Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            child: CircleAvatar(
-                              radius: 12,
-                              backgroundColor: AppTheme.inputBackground,
-                              child: Text(
-                                '+${trail["additionalCount"]}',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textWhite,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                    HistoryParticipantsRow(memberIds: members),
+
                   ],
                 ),
               ),
             ),
 
-            // Date and Duration
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    trail["date"],
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textGray.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        FontAwesomeIcons.clock,
-                        size: 12,
-                        color: AppTheme.textGray.withOpacity(0.6),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        trail["duration"],
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textGray.withOpacity(0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              child: Text(
+                date,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textGray.withOpacity(0.7),
+                ),
               ),
             ),
           ],
@@ -458,3 +444,75 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
     );
   }
 }
+
+class HistoryParticipantsRow extends StatelessWidget {
+  final List<String> memberIds;
+
+  const HistoryParticipantsRow({
+    super.key,
+    required this.memberIds,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (memberIds.isEmpty) {
+      return const SizedBox();
+    }
+
+    return FutureBuilder<QuerySnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .where(
+        FieldPath.documentId,
+        whereIn: memberIds.take(4).toList(),
+      )
+          .get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox(height: 24);
+        }
+
+        final users = snapshot.data!.docs;
+        final extraCount = memberIds.length - users.length;
+
+        return Row(
+          children: [
+            ...users.map((doc) {
+              final user = doc.data() as Map<String, dynamic>;
+              return Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: AppTheme.cardBackground,
+                  backgroundImage: NetworkImage(
+                    user['photoUrl'] ?? 'https://i.pravatar.cc/150',
+                  ),
+                ),
+              );
+            }),
+
+            if (extraCount > 0)
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppTheme.inputBackground,
+                child: Text(
+                  '+$extraCount',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textWhite,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+
+String _formatDate(DateTime date) {
+  return '${date.day}/${date.month}/${date.year}';
+}
+
