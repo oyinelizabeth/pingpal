@@ -47,7 +47,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       'name': widget.trailName,
       'destinationName': _destinationController.text.trim(),
       if (_selectedLatLng != null)
-        'destinationGeo': GeoPoint(
+        'destination': GeoPoint(
           _selectedLatLng!.latitude,
           _selectedLatLng!.longitude,
         ),
