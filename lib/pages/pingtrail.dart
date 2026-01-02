@@ -67,7 +67,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
     });
   }
 
-
   // Decline Pingtrail
   Future<void> declinePingtrail(String pingtrailId) async {
     await FirebaseFirestore.instance
@@ -111,10 +110,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
       ),
     );
   }
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -218,9 +213,38 @@ class _PingtrailPageState extends State<PingtrailPage> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: Share live location
+                    onPressed: () async {
+                      final snap = await FirebaseFirestore.instance
+                          .collection('pingtrails')
+                          .where('members', arrayContains: currentUserId)
+                          .where('status', isEqualTo: 'active')
+                          .limit(1)
+                          .get();
+
+                      if (snap.docs.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No active pingtrail to share location with'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final doc = snap.docs.first;
+                      final GeoPoint dest = doc['destination'];
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ActivePingtrailMapPage(
+                            pingtrailId: doc.id,
+                            destination: dest,
+                          ),
+                        ),
+                      );
                     },
+
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       side: const BorderSide(
@@ -232,6 +256,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
+
                     icon: const Icon(
                       FontAwesomeIcons.locationCrosshairs,
                       color: AppTheme.textWhite,
@@ -370,7 +395,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   },
                 ),
 
-
                 // Past Pingtrails Section
                 const Text(
                   'Past Pingtrails',
@@ -388,7 +412,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   stream: FirebaseFirestore.instance
                       .collection('pingtrails')
                       .where('members', arrayContains: currentUserId)
-                      .where('status', isEqualTo: 'completed')
+                      .where('status', isEqualTo: ['completed', 'cancelled'])
                       .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
@@ -498,7 +522,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
       ),
     );
   }
-
 
   Widget _buildPendingPingtrails() {
     return StreamBuilder<QuerySnapshot>(

@@ -32,9 +32,108 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
     if (distance <= 50) return ArrivalStatus.arrived;
     if (now.isAfter(arrivalTime)) return ArrivalStatus.late;
-
     return ArrivalStatus.enRoute;
   }
+
+  Future<void> _leavePingtrail(BuildContext context) async {
+    await FirebaseFirestore.instance
+        .collection('pingtrails')
+        .doc(doc.id)
+        .update({
+      'members': FieldValue.arrayRemove([currentUserId]),
+      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+    });
+
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _confirmLeavePingtrail(BuildContext context) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardBackground,
+        title: const Text(
+          'Leave Pingtrail?',
+          style: TextStyle(color: AppTheme.textWhite),
+        ),
+        content: const Text(
+          'You will no longer share or receive live location updates.',
+          style: TextStyle(color: AppTheme.textGray),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Leave',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await FirebaseFirestore.instance
+          .collection('pingtrails')
+          .doc(doc.id)
+          .update({
+        'members': FieldValue.arrayRemove([currentUserId]),
+        'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+        'leftMembers': FieldValue.arrayUnion([currentUserId]),
+      });
+
+      if (context.mounted) Navigator.pop(context);
+    }
+  }
+
+  Future<void> _confirmCancelPingtrail(BuildContext context) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardBackground,
+        title: const Text(
+          'Cancel Pingtrail?',
+          style: TextStyle(color: AppTheme.textWhite),
+        ),
+        content: const Text(
+          'This will end the pingtrail for all participants.',
+          style: TextStyle(color: AppTheme.textGray),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Cancel Pingtrail',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await FirebaseFirestore.instance
+          .collection('pingtrails')
+          .doc(doc.id)
+          .update({
+        'status': 'cancelled',
+        'endedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (context.mounted) Navigator.pop(context);
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +145,8 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     final GeoPoint destination = data['destination'];
     final DateTime arrivalTime =
     (data['arrivalTime'] as Timestamp).toDate();
+    final bool isHost = data['hostId'] == currentUserId;
+
 
     final List<String> members =
     List<String>.from(data['members'] ?? []);
@@ -111,7 +212,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            /// Accepted count
+            /// Active count
             Text(
               '${accepted.length} / ${members.length} pingpals active',
               style: const TextStyle(
@@ -144,20 +245,17 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
                       .where('uid', isEqualTo: uid)
                       .limit(1)
                       .snapshots(),
-                  builder: (context, snapshot) {
+                  builder: (context, locationSnap) {
                     ArrivalStatus? status;
 
-                    if (snapshot.hasData &&
-                        snapshot.data!.docs.isNotEmpty) {
-                      final locData = snapshot.data!.docs.first.data()
+                    if (locationSnap.hasData &&
+                        locationSnap.data!.docs.isNotEmpty) {
+                      final locData = locationSnap.data!.docs.first.data()
                       as Map<String, dynamic>;
-
-                      final GeoPoint userLocation =
-                      locData['location'];
 
                       status = _getArrivalStatus(
                         destination: destination,
-                        userLocation: userLocation,
+                        userLocation: locData['location'],
                         arrivalTime: arrivalTime,
                       );
                     }
@@ -173,6 +271,31 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
             ),
 
             const SizedBox(height: 28),
+
+            if (isHost)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => _confirmCancelPingtrail(context),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    foregroundColor: Colors.red,
+                  ),
+                  child: const Text('Cancel Pingtrail'),
+                ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => _confirmLeavePingtrail(context),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    foregroundColor: Colors.red,
+                  ),
+                  child: const Text('Leave Pingtrail'),
+                ),
+              ),
 
             /// Track button
             ElevatedButton.icon(
@@ -205,8 +328,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
   }
 }
 
-
-/// Live Status
+/// Pingpal Tile
 
 class _PingpalTile extends StatelessWidget {
   final String uid;
@@ -238,33 +360,50 @@ class _PingpalTile extends StatelessWidget {
         statusText = 'En route';
     }
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const CircleAvatar(
-        backgroundColor: AppTheme.inputBackground,
-        child: Icon(Icons.person),
-      ),
-      title: Text(
-        uid,
-        style: const TextStyle(color: AppTheme.textWhite),
-      ),
-      subtitle: isAccepted
-          ? Text(
-        statusText,
-        style: TextStyle(
-          color: statusColor,
-          fontWeight: FontWeight.w600,
-        ),
-      )
-          : const Text(
-        'Pending',
-        style: TextStyle(color: AppTheme.textGray),
-      ),
-      trailing: Icon(
-        Icons.circle,
-        size: 12,
-        color: isAccepted ? statusColor : AppTheme.textGray,
-      ),
+    return FutureBuilder<DocumentSnapshot>(
+      future:
+      FirebaseFirestore.instance.collection('users').doc(uid).get(),
+      builder: (context, snapshot) {
+        String displayName = 'Pingpal';
+
+        if (snapshot.hasData && snapshot.data!.data() != null) {
+          final user =
+          snapshot.data!.data() as Map<String, dynamic>;
+          displayName = user['fullName'] ?? 'Pingpal';
+        }
+
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const CircleAvatar(
+            backgroundColor: AppTheme.inputBackground,
+            child: Icon(Icons.person, color: AppTheme.primaryBlue),
+          ),
+          title: Text(
+            displayName,
+            style: const TextStyle(
+              color: AppTheme.textWhite,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: isAccepted
+              ? Text(
+            statusText,
+            style: TextStyle(
+              color: statusColor,
+              fontWeight: FontWeight.w600,
+            ),
+          )
+              : const Text(
+            'Pending',
+            style: TextStyle(color: AppTheme.textGray),
+          ),
+          trailing: Icon(
+            Icons.circle,
+            size: 12,
+            color: isAccepted ? statusColor : AppTheme.textGray,
+          ),
+        );
+      },
     );
   }
 }
