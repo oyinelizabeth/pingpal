@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 
 class AddFriendPage extends StatefulWidget {
@@ -90,7 +91,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     return outgoing.docs.isNotEmpty || incoming.docs.isNotEmpty;
   }
 
-  // 📤 SEND FRIEND REQUEST
+  // Send friend request
   Future<void> sendFriendRequest() async {
     if (foundUser == null || isSending || requestSent) return;
 
@@ -125,6 +126,15 @@ class _AddFriendPageState extends State<AddFriendPage> {
       'status': 'pending',
       'timestamp': FieldValue.serverTimestamp(),
     });
+
+    await NotificationService.send(
+      receiverId: receiverId,
+      senderId: currentUserId,
+      type: 'friend_request_sent',
+      title: 'New friend request',
+      body: '${senderData['fullName']} sent you a ping request',
+    );
+
 
     _showMessage('Friend request sent');
 

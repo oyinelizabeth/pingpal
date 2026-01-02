@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
@@ -64,6 +65,22 @@ class _RequestsPageState extends State<RequestsPage>
     );
 
     await batch.commit();
+
+    final receiverDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUserId)
+        .get();
+
+    final receiverName = receiverDoc['fullName'];
+
+    await NotificationService.send(
+      receiverId: senderId,
+      senderId: currentUserId,
+      type: 'friend_request_accepted',
+      title: 'Ping request accepted',
+      body: '$receiverName accepted your ping request',
+    );
+
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
+import 'active_pingtrail_map.dart';
 import 'pingtrail_invitation.dart';
 import 'user_profile.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/notification_service.dart';
+
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -15,13 +20,42 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final int _navIndex = 1; // Requests tab
-  int _newNotificationsCount = 2;
+  final int _navIndex = 1;
+
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+  String currentUserName = 'A user';
+
+  String _dateLabel(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    final d = DateTime(date.year, date.month, date.day);
+
+    if (d == today) return 'Today';
+    if (d == yesterday) return 'Yesterday';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+
+  Stream<QuerySnapshot> _notificationsStream({List<String>? types}) {
+    Query query = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('receiverId', isEqualTo: currentUserId)
+        .orderBy('createdAt', descending: true);
+
+    if (types != null && types.isNotEmpty) {
+      query = query.where('type', whereIn: types);
+    }
+
+    return query.snapshots();
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _loadCurrentUserName();
   }
 
   @override
@@ -30,10 +64,122 @@ class _NotificationsPageState extends State<NotificationsPage>
     super.dispose();
   }
 
-  void _markAllAsRead() {
-    setState(() {
-      _newNotificationsCount = 0;
+
+  Future<void> _loadCurrentUserName() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUserId)
+        .get();
+
+    if (snap.exists) {
+      setState(() {
+        currentUserName = snap.data()?['fullName'] ?? 'A user';
+      });
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    final batch = FirebaseFirestore.instance.batch();
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('notifications')
+        .where('receiverId', isEqualTo: currentUserId)
+        .where('read', isEqualTo: false)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      batch.update(doc.reference, {'read': true});
+    }
+
+    await batch.commit();
+  }
+
+  Future<void> _acceptFriendRequest(String senderId, String notificationId) async {
+    final batch = FirebaseFirestore.instance.batch();
+
+    final currentUserRef =
+    FirebaseFirestore.instance.collection('users').doc(currentUserId);
+    final senderRef =
+    FirebaseFirestore.instance.collection('users').doc(senderId);
+    final notificationRef =
+    FirebaseFirestore.instance.collection('notifications').doc(notificationId);
+
+    batch.update(currentUserRef, {
+      'friends': FieldValue.arrayUnion([senderId]),
     });
+
+    batch.update(senderRef, {
+      'friends': FieldValue.arrayUnion([currentUserId]),
+    });
+
+    batch.update(notificationRef, {'read': true});
+
+    await batch.commit();
+
+    await NotificationService.send(
+      receiverId: senderId,
+      senderId: currentUserId,
+      title: 'Friend request accepted',
+      body: '$currentUserName accepted your friend request',
+      type: 'friend_request_accepted',
+    );
+
+  }
+
+  Future<void> _declineNotification(String notificationId) async {
+    await FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(notificationId)
+        .delete();
+  }
+
+  Future<void> _acceptPingtrailFromNotification(
+      String pingtrailId,
+      String notificationId,
+      ) async {
+    final ref =
+    FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data()!;
+
+      final accepted =
+      List<String>.from(data['acceptedMembers'] ?? []);
+      final members = List<String>.from(data['members']);
+
+      if (!accepted.contains(currentUserId)) {
+        accepted.add(currentUserId);
+      }
+
+      tx.update(ref, {
+        'acceptedMembers': accepted,
+        'status': accepted.length == members.length ? 'active' : 'pending',
+      });
+    });
+
+    await FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(notificationId)
+        .update({'read': true});
+  }
+
+  Future<void> _declinePingtrailFromNotification(
+      String pingtrailId,
+      String notificationId,
+      ) async {
+    await FirebaseFirestore.instance
+        .collection('pingtrails')
+        .doc(pingtrailId)
+        .update({
+      'members': FieldValue.arrayRemove([currentUserId]),
+      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+    });
+
+    await FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(notificationId)
+        .delete();
   }
 
   @override
@@ -59,17 +205,26 @@ class _NotificationsPageState extends State<NotificationsPage>
                           color: AppTheme.textWhite,
                         ),
                       ),
-                      if (_newNotificationsCount > 0) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.primaryBlue,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('notifications')
+                            .where('receiverId', isEqualTo: currentUserId)
+                            .where('read', isEqualTo: false)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data?.docs.length ?? 0;
+                          if (count == 0) return const SizedBox();
+
+                          return Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.primaryBlue,
+                              shape: BoxShape.circle,
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                   TextButton(
@@ -165,384 +320,314 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _buildAllTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'NEW',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textGray.withOpacity(0.6),
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildPingpalRequestCard(),
-          const SizedBox(height: 12),
-          _buildPingtrailInvitationCard(),
-          const SizedBox(height: 24),
-          Text(
-            'EARLIER',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textGray.withOpacity(0.6),
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildArrivalNotification(),
-          const SizedBox(height: 12),
-          _buildSystemNotification(),
-          const SizedBox(height: 12),
-          _buildDeclinedNotification(),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
+    return StreamBuilder<QuerySnapshot>(
+      stream: _notificationsStream(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-  Widget _buildRequestsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'NEW',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textGray.withOpacity(0.6),
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildPingpalRequestCard(),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
+        final notifications = snapshot.data!.docs;
 
-  Widget _buildPingtrailsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'NEW',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textGray.withOpacity(0.6),
-              letterSpacing: 1,
+        if (notifications.isEmpty) {
+          return const Center(
+            child: Text(
+              'No notifications yet',
+              style: TextStyle(color: AppTheme.textGray),
             ),
-          ),
-          const SizedBox(height: 12),
-          _buildPingtrailInvitationCard(),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
+          );
+        }
 
-  Widget _buildArrivalsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'RECENT',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textGray.withOpacity(0.6),
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildArrivalNotification(),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
+        final Map<String, List<QueryDocumentSnapshot>> grouped = {};
 
-  Widget _buildPingpalRequestCard() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const UserProfilePage(
-              userId: 'sarah_j',
-              initialStatus: RelationshipStatus.pendingReceived,
-            ),
-          ),
+        for (final doc in notifications) {
+          final ts = doc['createdAt'] as Timestamp;
+          final label = _dateLabel(ts.toDate());
+          grouped.putIfAbsent(label, () => []).add(doc);
+        }
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          children: grouped.entries.map((entry) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    entry.key.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textGray.withOpacity(0.6),
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                ...entry.value.map(_buildNotificationTile),
+              ],
+            );
+          }).toList(),
         );
+
       },
+    );
+  }
+
+  Widget _buildNotificationTile(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    final bool isRead = data['read'] == true;
+    final String type = data['type'];
+    final Timestamp ts = data['createdAt'];
+    final DateTime time = ts.toDate();
+
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case 'friend_request_sent':
+        icon = FontAwesomeIcons.userPlus;
+        iconColor = AppTheme.primaryBlue;
+        break;
+
+      case 'friend_request_accepted':
+        icon = FontAwesomeIcons.userCheck;
+        iconColor = Colors.green;
+        break;
+
+      case 'pingtrail_invite':
+        icon = FontAwesomeIcons.route;
+        iconColor = AppTheme.primaryBlue;
+        break;
+
+      case 'pingtrail_accepted':
+        icon = FontAwesomeIcons.check;
+        iconColor = Colors.green;
+        break;
+
+      case 'pingtrail_declined':
+        icon = FontAwesomeIcons.xmark;
+        iconColor = Colors.red;
+        break;
+
+      case 'arrival':
+        icon = FontAwesomeIcons.locationDot;
+        iconColor = Colors.green;
+        break;
+
+      default:
+        icon = FontAwesomeIcons.bell;
+        iconColor = AppTheme.textGray;
+    }
+
+    return GestureDetector(
+      onTap: () async {
+        await FirebaseFirestore.instance
+            .collection('notifications')
+            .doc(doc.id)
+            .update({'read': true});
+
+        final String type = data['type'];
+
+        switch (type) {
+
+        // Pingtrail invitation
+          case 'pingtrail_invite':
+            if (data['invitationId'] == null) {
+              _showSnack(context, 'Invitation is no longer available');
+              return;
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PingtrailInvitationPage(
+                  pingtrailId: data['pingtrailId'],
+                  invitationId: data['invitationId'],
+                ),
+              ),
+            );
+            break;
+
+        // Pingtrail becomes active
+          case 'pingtrail_active':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ActivePingtrailMapPage(
+                  pingtrailId: data['pingtrailId'],
+                ),
+              ),
+            );
+            break;
+
+        // User arrived
+          case 'arrival':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ActivePingtrailMapPage(
+                  pingtrailId: data['pingtrailId'],
+                ),
+              ),
+            );
+            break;
+
+        // Freidn requested accepted
+          case 'friend_request_accepted':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UserProfilePage(
+                  userId: data['senderId'],
+                ),
+              ),
+            );
+            break;
+
+        // Friend request sent
+          case 'friend_request_sent':
+          // stays inline (buttons already shown)
+            break;
+
+          default:
+            _showSnack(context, 'Nothing to open for this notification');
+        }
+      },
+
       child: Container(
-        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppTheme.cardBackground,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppTheme.primaryBlue.withOpacity(0.3),
-            width: 1.5,
+            color: isRead
+                ? AppTheme.borderColor
+                : AppTheme.primaryBlue.withOpacity(0.5),
           ),
         ),
-        child: Column(
+        child: Stack(
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Stack(
-                  children: [
-                    const CircleAvatar(
-                      radius: 28,
-                      backgroundImage: NetworkImage(
-                        'https://i.pravatar.cc/150?img=3',
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppTheme.cardBackground,
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          FontAwesomeIcons.plus,
-                          color: Colors.white,
-                          size: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Sarah J.',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textWhite,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Wants to be your Pingpal',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textGray.withOpacity(0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '2 min ago',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textGray.withOpacity(0.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
-                      ),
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Accept pingpal request
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
-                      child: const Text(
-                        'Accept',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // Decline request
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: BorderSide(
-                        color: AppTheme.textGray.withOpacity(0.3),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                    ),
-                    child: const Text(
-                      'Decline',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textWhite,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPingtrailInvitationCard() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const PingtrailInvitationPage(),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppTheme.cardBackground,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: AppTheme.primaryBlue.withOpacity(0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
+                // Icon
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: AppTheme.inputBackground,
+                    color: iconColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    FontAwesomeIcons.route,
-                    color: AppTheme.primaryBlue,
-                    size: 24,
-                  ),
+                  child: Icon(icon, color: iconColor, size: 20),
                 ),
+
                 const SizedBox(width: 12),
+
+                // Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Roadtrip to Vegas',
-                        style: TextStyle(
-                          fontSize: 18,
+                      Text(
+                        data['title'],
+                        style: const TextStyle(
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: AppTheme.textWhite,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Mike invited you to join the trail',
+                        data['body'],
                         style: TextStyle(
                           fontSize: 13,
                           color: AppTheme.textGray.withOpacity(0.8),
                         ),
                       ),
+
+                      // ACCEPT / DECLINE
+                      if (type == 'friend_request_sent' ||
+                          type == 'pingtrail_invite') ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (type == 'friend_request_sent') {
+                                    _acceptFriendRequest(
+                                      data['senderId'],
+                                      doc.id,
+                                    );
+                                  } else {
+                                    _acceptPingtrailFromNotification(
+                                      data['pingtrailId'],
+                                      doc.id,
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryBlue,
+                                  padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                                child: const Text('Accept'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  if (type == 'pingtrail_invite') {
+                                    _declinePingtrailFromNotification(
+                                      data['pingtrailId'],
+                                      doc.id,
+                                    );
+                                  } else {
+                                    _declineNotification(doc.id);
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                                child: const Text('Decline'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
-                ),
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PingtrailInvitationPage(),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: const Text(
-                  'Join Trail',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Center(
+
+            // DELETE (X) BUTTON
+            Positioned(
+              top: 0,
+              right: 0,
               child: IconButton(
-                onPressed: () {
-                  // Dismiss notification
-                },
                 icon: Icon(
                   FontAwesomeIcons.xmark,
-                  size: 18,
+                  size: 14,
                   color: AppTheme.textGray.withOpacity(0.6),
                 ),
+                onPressed: () {
+                  FirebaseFirestore.instance
+                      .collection('notifications')
+                      .doc(doc.id)
+                      .delete();
+                },
               ),
             ),
           ],
@@ -551,181 +636,106 @@ class _NotificationsPageState extends State<NotificationsPage>
     );
   }
 
-  Widget _buildArrivalNotification() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Row(
-        children: [
-          Stack(
-            children: [
-              const CircleAvatar(
-                radius: 24,
-                backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=4'),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppTheme.cardBackground,
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(
-                    FontAwesomeIcons.check,
-                    color: Colors.white,
-                    size: 8,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tom arrived at Downtown Coffee',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.textWhite,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '2h ago',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textGray.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+
+  Widget _buildRequestsTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _notificationsStream(types: [
+        'friend_request_sent',
+        'friend_request_accepted',
+      ]),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data!.docs;
+
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text('No request notifications',
+                style: TextStyle(color: AppTheme.textGray)),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            return _buildNotificationTile(docs[index]);
+          },
+        );
+      },
     );
   }
 
-  Widget _buildSystemNotification() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryBlue.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              FontAwesomeIcons.cloudArrowUp,
-              color: AppTheme.primaryBlue,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Cloud cache optimized',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.textWhite,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Your location is syncing 2x faster',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textGray.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '5h ago',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textGray.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  Widget _buildPingtrailsTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _notificationsStream(types: [
+        'pingtrail_invite',
+        'pingtrail_accepted',
+        'pingtrail_declined',
+        'pingtrail_cancelled',
+        'pingtrail_left',
+      ]),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data!.docs;
+
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text('No pingtrail notifications',
+                style: TextStyle(color: AppTheme.textGray)),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            return _buildNotificationTile(docs[index]);
+          },
+        );
+      },
     );
   }
 
-  Widget _buildDeclinedNotification() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 24,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=6'),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Weekend Hike',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.textWhite,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'You declined this invitation',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textGray.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '1d ago',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textGray.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+
+  Widget _buildArrivalsTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _notificationsStream(types: ['arrival']),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data!.docs;
+
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text('No arrival updates',
+                style: TextStyle(color: AppTheme.textGray)),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            return _buildNotificationTile(docs[index]);
+          },
+        );
+      },
     );
   }
 }
+
+void _showSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message)),
+  );
+}
+
+
