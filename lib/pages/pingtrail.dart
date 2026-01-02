@@ -497,29 +497,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
           ),
         ),
       ),
-      bottomNavigationBar: NavBar(
-        currentIndex: _navIndex,
-        onTap: (index) {
-          if (index == _navIndex) return; // Already on this page
-
-          if (index == 2) {
-            // Navigate to home/map
-            Navigator.pop(context);
-          } else if (index == 1) {
-            // Navigate to Pingpals
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const PingpalsPage()),
-            );
-          } else if (index == 3) {
-            // Navigate to Chat
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const ChatListPage()),
-            );
-          }
-        },
-      ),
     );
   }
 

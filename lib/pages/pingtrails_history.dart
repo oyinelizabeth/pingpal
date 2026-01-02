@@ -87,11 +87,6 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
           ],
         ),
       ),
-      bottomNavigationBar: NavBar(
-        currentIndex: _navIndex,
-        onTap: (_) =>
-            Navigator.popUntil(context, (route) => route.isFirst),
-      ),
     );
   }
 

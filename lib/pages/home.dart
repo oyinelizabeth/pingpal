@@ -29,7 +29,6 @@ class _HomePageState extends State<HomePage> {
 
   final List<Widget> _pages = [];
 
-  // Temporary demo data
   final List<Map<String, dynamic>> friends = [
     {
       "name": "Emma Wilson",

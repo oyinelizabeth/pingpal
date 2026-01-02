@@ -414,15 +414,6 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
           ),
         ),
       ),
-
-      bottomNavigationBar: NavBar(
-        currentIndex: _navIndex,
-        onTap: (index) {
-          if (index != _navIndex) {
-            Navigator.pop(context);
-          }
-        },
-      ),
     );
   }
 
