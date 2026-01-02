@@ -8,8 +8,7 @@ class LiveLocationService {
   static Position? _lastPosition;
 
   static Future<bool> _ensurePermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return false;
+    if (!await Geolocator.isLocationServiceEnabled()) return false;
 
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -20,19 +19,26 @@ class LiveLocationService {
         permission == LocationPermission.whileInUse;
   }
 
-  /// Start sharing live location for a specific pingtrail
+  /// START live tracking (safe)
   static Future<void> start({
     required String pingtrailId,
   }) async {
+    if (pingtrailId.isEmpty) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     final hasPermission = await _ensurePermission();
     if (!hasPermission) return;
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    await stop(); // prevent duplicate streams
+
+    final uid = user.uid;
 
     _positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 25, // update only if moved 25m
+        distanceFilter: 25,
       ),
     ).listen((position) async {
       if (_lastPosition != null) {
@@ -42,18 +48,17 @@ class LiveLocationService {
           position.latitude,
           position.longitude,
         );
-
         if (distance < 20) return;
       }
 
       _lastPosition = position;
 
       await FirebaseFirestore.instance
-          .collection('user_locations')
-          .doc('${uid}_$pingtrailId')
+          .collection('pingtrails')
+          .doc(pingtrailId)
+          .collection('liveLocations')
+          .doc(uid)
           .set({
-        'uid': uid,
-        'pingtrailId': pingtrailId,
         'location': GeoPoint(
           position.latitude,
           position.longitude,
@@ -63,10 +68,8 @@ class LiveLocationService {
     });
   }
 
-  /// Stop sharing location
-  static Future<void> stop({
-    required String pingtrailId,
-  }) async {
+  /// STOP live tracking
+  static Future<void> stop() async {
     await _positionStream?.cancel();
     _positionStream = null;
     _lastPosition = null;

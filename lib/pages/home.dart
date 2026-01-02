@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import '../widgets/search_bar_widget.dart';
+import '../widgets/active_pingtrail_details_sheet.dart';
 
 import 'profile.dart';
 import 'friends.dart';
@@ -22,7 +26,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Start on the Home (map) which corresponds to the center nav item (index 2)
   int _currentNavIndex = 2;
   GoogleMapController? _mapController;
   final bool _hasNotifications = true;
@@ -50,14 +53,12 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Do not build widgets that depend on context/MediaQuery in initState.
-    // Index 2 (center) is handled specially in build() via _buildMapView().
     _pages.addAll([
-      const PingtrailPage(), // index 0 - Pingtrail
-      const PingpalsPage(),  // index 1 - Pingpals
-      const SizedBox.shrink(), // index 2 - placeholder, map is built in build()
-      const ChatsPage(),     // index 3 - Chat
-      const SettingsPage(),  // index 4 - Settings
+      const PingtrailPage(),
+      const PingpalsPage(),
+      const SizedBox.shrink(),
+      const ChatsPage(),
+      const SettingsPage(),
     ]);
   }
 
@@ -79,14 +80,13 @@ class _HomePageState extends State<HomePage> {
   void _centerMapOnUser() {
     _mapController?.animateCamera(
       CameraUpdate.newLatLngZoom(
-        const LatLng(34.0522, -118.2437), // Los Angeles coordinates
+        const LatLng(51.5074, -0.1278),
         14,
       ),
     );
   }
 
   void _toggleMapLayers() {
-    // Toggle between different map types
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Map layers feature coming soon'),
@@ -118,25 +118,73 @@ class _HomePageState extends State<HomePage> {
   Widget _buildMapView() {
     return Stack(
       children: [
-        // Full-screen Map
-        GoogleMap(
-          initialCameraPosition: const CameraPosition(
-            target: LatLng(34.0522, -118.2437), // Los Angeles
-            zoom: 14,
-          ),
-          onMapCreated: (controller) {
-            _mapController = controller;
-          },
-          myLocationEnabled: true,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          markers: {
-            const Marker(
-              markerId: MarkerId('user_location'),
-              position: LatLng(34.0522, -118.2437),
-              infoWindow: InfoWindow(title: 'You'),
-            ),
+        // Full-screen Map with ACTIVE PINGTRAILS
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('pingtrails')
+              .where('status', isEqualTo: 'active')
+              .snapshots(),
+          builder: (context, snapshot) {
+            final Set<Marker> markers = {
+              const Marker(
+                markerId: MarkerId('user_location'),
+                position: LatLng(51.5074, -0.1278),
+                infoWindow: InfoWindow(title: 'You'),
+              ),
+            };
+
+            if (snapshot.hasData) {
+              for (final doc in snapshot.data!.docs) {
+                final data = doc.data() as Map<String, dynamic>;
+
+                if (data['destination'] is! GeoPoint) continue;
+
+                final GeoPoint dest = data['destination'];
+                final String title =
+                (data['destinationName'] ?? 'Pingtrail').toString();
+
+                markers.add(
+                  Marker(
+                    markerId: MarkerId('pingtrail_${doc.id}'),
+                    position: LatLng(dest.latitude, dest.longitude),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueAzure,
+                    ),
+                    infoWindow: InfoWindow(
+                      title: title,
+                      snippet: 'Active Pingtrail',
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => ActivePingtrailDetailsSheet(
+                            doc: doc,
+                            currentUserId:
+                            FirebaseAuth.instance.currentUser!.uid,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              }
+            }
+
+            return GoogleMap(
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(51.5074, -0.1278),
+                zoom: 14,
+              ),
+              onMapCreated: (controller) {
+                _mapController = controller;
+              },
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              markers: markers,
+            );
           },
         ),
 
@@ -148,17 +196,12 @@ class _HomePageState extends State<HomePage> {
           child: SafeArea(
             child: Row(
               children: [
-                // Search Bar
                 Expanded(
                   child: SearchBarWidget(
                     hintText: 'Search pingpals or places...',
-                    onTap: () {
-                      // Open search page
-                    },
+                    onTap: () {},
                   ),
                 ),
-
-                // Notification Icon
                 Container(
                   margin: const EdgeInsets.only(right: 16),
                   decoration: BoxDecoration(
@@ -203,52 +246,12 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
 
-        // User Location Marker with "You" label
-        Positioned(
-          bottom: 200,
-          left: MediaQuery.of(context).size.width / 2 - 30,
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.darkBackground,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.primaryBlue, width: 2),
-                ),
-                child: const Text(
-                  'You',
-                  style: TextStyle(
-                    color: AppTheme.textWhite,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.primaryBlue, width: 3),
-                  image: const DecorationImage(
-                    image: NetworkImage("https://i.pravatar.cc/150?img=5"),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
         // Floating Action Buttons
         Positioned(
           bottom: 100,
           right: 16,
           child: Column(
             children: [
-              // Center on User Button
               FloatingActionButton(
                 heroTag: 'center',
                 onPressed: _centerMapOnUser,
@@ -259,8 +262,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 12),
-
-              // Layers Button
               FloatingActionButton(
                 heroTag: 'layers',
                 onPressed: _toggleMapLayers,
@@ -274,7 +275,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
 
-        // Map Center Button (Red Circle from screenshot)
         Positioned(
           bottom: 100,
           left: MediaQuery.of(context).size.width / 2 - 35,
