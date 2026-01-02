@@ -13,6 +13,7 @@ import 'chat_list.dart';
 import '../widgets/pending_pingtrail_sheet.dart';
 import '../widgets/active_pingtrail_details_sheet.dart';
 import '../widgets/pingtrail_avatar_row.dart';
+import '../services/notification_service.dart';
 
 class PingtrailPage extends StatefulWidget {
   const PingtrailPage({super.key});
@@ -41,41 +42,88 @@ class _PingtrailPageState extends State<PingtrailPage> {
   // Accept Pingtrail
   Future<void> acceptPingtrail(String pingtrailId) async {
     final uid = currentUserId;
-    final ref =
-    FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    final ref = FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+
+    String? hostId;
+    bool didNewlyAccept = false;
+    bool everyoneAccepted = false;
 
     await FirebaseFirestore.instance.runTransaction((tx) async {
       final snap = await tx.get(ref);
-      final data = snap.data()!;
+      final data = snap.data() as Map<String, dynamic>;
 
-      final members = List<String>.from(data['members']);
-      final accepted = List<String>.from(data['acceptedMembers']);
+      hostId = data['hostId'] as String?;
 
-      // Add user if not already accepted
+      final members = List<String>.from(data['members'] ?? []);
+      final accepted = List<String>.from(data['acceptedMembers'] ?? []);
+
+      // Only mark newly accepted if user wasn't already in acceptedMembers
       if (!accepted.contains(uid)) {
         accepted.add(uid);
+        didNewlyAccept = true;
       }
 
-      final bool everyoneAccepted = accepted.length == members.length;
+      everyoneAccepted = accepted.length == members.length;
 
       tx.update(ref, {
         'acceptedMembers': accepted,
         'status': everyoneAccepted ? 'active' : 'pending',
-        'startedAt':
-        everyoneAccepted ? FieldValue.serverTimestamp() : null,
+        'startedAt': everyoneAccepted ? FieldValue.serverTimestamp() : null,
       });
     });
+
+    // Send notification outside the transaction
+    if (hostId != null && didNewlyAccept) {
+      await NotificationService.send(
+        receiverId: hostId!,
+        senderId: uid,
+        title: 'Pingtrail accepted',
+        body: 'A pingpal joined your pingtrail',
+        type: 'pingtrail_accepted',
+        pingtrailId: pingtrailId,
+      );
+    }
+
+  if (everyoneAccepted) {
+    final snap = await ref.get();
+    final data = snap.data() as Map<String, dynamic>;
+    final members = List<String>.from(data['members'] ?? []);
+
+    for (final memberId in members) {
+      if (memberId == uid) continue;
+      await NotificationService.send(
+        receiverId: memberId,
+        senderId: uid,
+        title: 'Pingtrail is active',
+        body: 'Everyone accepted — your pingtrail has started!',
+        type: 'pingtrail_active',
+        pingtrailId: pingtrailId,
+      );
+    }
+  }
   }
 
   // Decline Pingtrail
   Future<void> declinePingtrail(String pingtrailId) async {
-    await FirebaseFirestore.instance
-        .collection('pingtrails')
-        .doc(pingtrailId)
-        .update({
+    final ref = FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+
+    final snap = await ref.get();
+    final data = snap.data() as Map<String, dynamic>;
+    final String hostId = data['hostId'];
+
+    await ref.update({
       'members': FieldValue.arrayRemove([currentUserId]),
       'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
     });
+
+    await NotificationService.send(
+      receiverId: hostId,
+      senderId: currentUserId,
+      title: 'Pingtrail declined',
+      body: 'A pingpal declined your pingtrail',
+      type: 'pingtrail_declined',
+      pingtrailId: pingtrailId,
+    );
   }
 
   // Popup for pending pingtrail
@@ -239,7 +287,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
                         MaterialPageRoute(
                           builder: (_) => ActivePingtrailMapPage(
                             pingtrailId: doc.id,
-                            destination: dest,
                           ),
                         ),
                       );
@@ -645,8 +692,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
     );
   }
 
-
-
   Widget _buildNoActivePingtrail() {
     return Container(
       width: double.infinity,
@@ -684,8 +729,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
       ),
     );
   }
-
-
 }
 
 class ActivePingtrailCard extends StatelessWidget {
@@ -715,21 +758,21 @@ class ActivePingtrailCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          width: double.infinity, // ✅ full width
+          width: double.infinity,
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: AppTheme.cardBackground,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: AppTheme.primaryBlue, // highlight active
+              color: AppTheme.primaryBlue,
               width: 1.5,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 👥 avatars bunched left
+              // avatars bunched left
               PingtrailAvatarRow(
                 memberIds: members,
                 radius: 18,
@@ -737,7 +780,7 @@ class ActivePingtrailCard extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              // 🏷 name
+              // name
               Text(
                 name,
                 style: const TextStyle(
@@ -749,7 +792,7 @@ class ActivePingtrailCard extends StatelessWidget {
 
               const SizedBox(height: 6),
 
-              // 📍 destination
+              // destination
               Text(
                 destinationName,
                 style: TextStyle(
@@ -760,7 +803,7 @@ class ActivePingtrailCard extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              // 🟢 active status
+              // active status
               Row(
                 children: [
                   const Icon(

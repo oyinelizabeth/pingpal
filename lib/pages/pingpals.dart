@@ -7,7 +7,6 @@ import '../widgets/navbar.dart';
 import 'requests.dart';
 import 'user_profile.dart';
 import 'chats.dart';
-import 'pingtrail.dart';
 import 'chat_list.dart';
 import 'add_friends.dart';
 

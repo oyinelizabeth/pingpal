@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+
 import '../theme/app_theme.dart';
 import '../pages/active_pingtrail_map.dart';
+import '../services/notification_service.dart';
 
 enum ArrivalStatus { arrived, enRoute, late }
 
@@ -16,6 +18,11 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     required this.currentUserId,
   });
 
+  /// Convenience accessor
+  Map<String, dynamic> get trail =>
+      doc.data() as Map<String, dynamic>;
+
+  /// Compute arrival status
   ArrivalStatus _getArrivalStatus({
     required GeoPoint destination,
     required GeoPoint userLocation,
@@ -35,20 +42,33 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     return ArrivalStatus.enRoute;
   }
 
+  /// Leave pingtrail + notify host
   Future<void> _leavePingtrail(BuildContext context) async {
+    final String pingtrailId = doc.id;
+    final String hostId = trail['creatorId'];
+
     await FirebaseFirestore.instance
         .collection('pingtrails')
-        .doc(doc.id)
+        .doc(pingtrailId)
         .update({
       'members': FieldValue.arrayRemove([currentUserId]),
       'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+      'leftMembers': FieldValue.arrayUnion([currentUserId]),
     });
 
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
+    await NotificationService.send(
+      receiverId: hostId,
+      senderId: currentUserId,
+      title: 'Pingtrail update',
+      body: 'A member left the pingtrail',
+      type: 'pingtrail_left',
+      pingtrailId: pingtrailId,
+    );
+
+    if (context.mounted) Navigator.pop(context);
   }
 
+  /// Confirm leave dialog
   Future<void> _confirmLeavePingtrail(BuildContext context) async {
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -79,19 +99,11 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     );
 
     if (confirm == true) {
-      await FirebaseFirestore.instance
-          .collection('pingtrails')
-          .doc(doc.id)
-          .update({
-        'members': FieldValue.arrayRemove([currentUserId]),
-        'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
-        'leftMembers': FieldValue.arrayUnion([currentUserId]),
-      });
-
-      if (context.mounted) Navigator.pop(context);
+      await _leavePingtrail(context);
     }
   }
 
+  /// Confirm cancel (host only)
   Future<void> _confirmCancelPingtrail(BuildContext context) async {
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -134,10 +146,9 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = trail;
 
     final String pingtrailId = doc.id;
     final String trailName = data['name'] ?? 'Pingtrail';
@@ -145,8 +156,9 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     final GeoPoint destination = data['destination'];
     final DateTime arrivalTime =
     (data['arrivalTime'] as Timestamp).toDate();
-    final bool isHost = data['hostId'] == currentUserId;
 
+    final String hostId = data['creatorId'];
+    final bool isHost = hostId == currentUserId;
 
     final List<String> members =
     List<String>.from(data['members'] ?? []);
@@ -250,7 +262,8 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
                     if (locationSnap.hasData &&
                         locationSnap.data!.docs.isNotEmpty) {
-                      final locData = locationSnap.data!.docs.first.data()
+                      final locData =
+                      locationSnap.data!.docs.first.data()
                       as Map<String, dynamic>;
 
                       status = _getArrivalStatus(
@@ -272,30 +285,27 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            if (isHost)
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => _confirmCancelPingtrail(context),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    foregroundColor: Colors.red,
+            /// Host / Leave buttons
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: isHost
+                    ? () => _confirmCancelPingtrail(context)
+                    : () => _confirmLeavePingtrail(context),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: isHost ? Colors.red : Colors.orange,
                   ),
-                  child: const Text('Cancel Pingtrail'),
+                  foregroundColor:
+                  isHost ? Colors.red : Colors.orange,
                 ),
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => _confirmLeavePingtrail(context),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    foregroundColor: Colors.red,
-                  ),
-                  child: const Text('Leave Pingtrail'),
+                child: Text(
+                  isHost ? 'Cancel Pingtrail' : 'Leave Pingtrail',
                 ),
               ),
+            ),
+
+            const SizedBox(height: 12),
 
             /// Track button
             ElevatedButton.icon(
@@ -306,7 +316,6 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => ActivePingtrailMapPage(
                       pingtrailId: pingtrailId,
-                      destination: destination,
                     ),
                   ),
                 );
@@ -328,7 +337,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
   }
 }
 
-/// Pingpal Tile
+/// ---------------- Pingpal Tile ----------------
 
 class _PingpalTile extends StatelessWidget {
   final String uid;

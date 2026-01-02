@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:google_places_flutter/model/prediction.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
@@ -115,7 +116,6 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
   }
 
   // Create Pingtrail
-
   Future<void> _startPingtrail() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -142,6 +142,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       return;
     }
 
+    final pingtrailRef =
     await FirebaseFirestore.instance.collection('pingtrails').add({
       'hostId': user.uid,
       'name': widget.trailName,
@@ -158,6 +159,29 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       'startedAt': null,
       'endedAt': null,
     });
+
+    final pingtrailId = pingtrailRef.id;
+
+    // Notify invited pingpals
+    final hostDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final hostName = hostDoc['fullName'];
+
+    for (final uid in widget.selectedFriends) {
+      if (uid == user.uid) continue;
+
+      await NotificationService.send(
+        receiverId: uid,
+        senderId: user.uid,
+        type: 'pingtrail_invite',
+        title: 'Pingtrail invite',
+        body: '$hostName invited you to "${widget.trailName}"',
+        pingtrailId: pingtrailId,
+      );
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
