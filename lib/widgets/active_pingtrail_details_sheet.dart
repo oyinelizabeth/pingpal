@@ -18,11 +18,12 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     required this.currentUserId,
   });
 
-  /// Convenience accessor
-  Map<String, dynamic> get trail =>
-      doc.data() as Map<String, dynamic>;
+  Map<String, dynamic> get _data {
+    final raw = doc.data();
+    if (raw is Map<String, dynamic>) return raw;
+    return <String, dynamic>{};
+  }
 
-  /// Compute arrival status
   ArrivalStatus _getArrivalStatus({
     required GeoPoint destination,
     required GeoPoint userLocation,
@@ -42,10 +43,11 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     return ArrivalStatus.enRoute;
   }
 
-  /// Leave pingtrail + notify host
   Future<void> _leavePingtrail(BuildContext context) async {
-    final String pingtrailId = doc.id;
-    final String hostId = trail['creatorId'];
+    final pingtrailId = doc.id;
+
+    // Host id might be missing mid-update, so null-safe
+    final hostId = (_data['creatorId'] ?? '').toString();
 
     await FirebaseFirestore.instance
         .collection('pingtrails')
@@ -56,19 +58,21 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
       'leftMembers': FieldValue.arrayUnion([currentUserId]),
     });
 
-    await NotificationService.send(
-      receiverId: hostId,
-      senderId: currentUserId,
-      title: 'Pingtrail update',
-      body: 'A member left the pingtrail',
-      type: 'pingtrail_left',
-      pingtrailId: pingtrailId,
-    );
+    // Only send if we actually have a host id
+    if (hostId.isNotEmpty) {
+      await NotificationService.send(
+        receiverId: hostId,
+        senderId: currentUserId,
+        title: 'Pingtrail update',
+        body: 'A member left the pingtrail',
+        type: 'pingtrail_left',
+        pingtrailId: pingtrailId,
+      );
+    }
 
     if (context.mounted) Navigator.pop(context);
   }
 
-  /// Confirm leave dialog
   Future<void> _confirmLeavePingtrail(BuildContext context) async {
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -103,7 +107,6 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     }
   }
 
-  /// Confirm cancel (host only)
   Future<void> _confirmCancelPingtrail(BuildContext context) async {
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -148,22 +151,40 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = trail;
+    final data = _data;
 
     final String pingtrailId = doc.id;
-    final String trailName = data['name'] ?? 'Pingtrail';
-    final String destinationName = data['destinationName'] ?? '';
-    final GeoPoint destination = data['destination'];
-    final DateTime arrivalTime =
-    (data['arrivalTime'] as Timestamp).toDate();
 
-    final String hostId = data['creatorId'];
-    final bool isHost = hostId == currentUserId;
+    // Strings: ALWAYS .toString() on fallback to avoid null-cast crashes
+    final String destinationName =
+    (data['destinationName'] ?? 'Unknown destination').toString();
 
+    // If you don’t have a dedicated "name" field, use destinationName for title
+    final String trailName =
+    (data['name'] ?? destinationName).toString();
+
+    // creatorId: null-safe
+    final String creatorId =
+    (data['creatorId'] ?? '').toString();
+
+    final bool isHost = creatorId.isNotEmpty && creatorId == currentUserId;
+
+    // destination: null-safe GeoPoint fallback
+    final GeoPoint destination = data['destination'] is GeoPoint
+        ? data['destination'] as GeoPoint
+        : const GeoPoint(0, 0);
+
+    // arrivalTime: null-safe Timestamp fallback
+    final Timestamp? arrivalTs = data['arrivalTime'] is Timestamp
+        ? data['arrivalTime'] as Timestamp
+        : null;
+    final DateTime arrivalTime = arrivalTs?.toDate() ?? DateTime.now();
+
+    // lists: safe parsing
     final List<String> members =
-    List<String>.from(data['members'] ?? []);
+    List<String>.from((data['members'] ?? const <dynamic>[]) as List);
     final List<String> accepted =
-    List<String>.from(data['acceptedMembers'] ?? []);
+    List<String>.from((data['acceptedMembers'] ?? const <dynamic>[]) as List);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -176,7 +197,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// Drag handle
+            // Drag handle
             Center(
               child: Container(
                 width: 40,
@@ -189,7 +210,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
               ),
             ),
 
-            /// Title
+            // Title
             Text(
               trailName,
               style: const TextStyle(
@@ -201,7 +222,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            /// Destination
+            // Destination
             Text(
               destinationName,
               style: TextStyle(
@@ -212,7 +233,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            /// Arrival time
+            // Arrival time
             Text(
               'Arrive by ${TimeOfDay.fromDateTime(arrivalTime).format(context)}',
               style: const TextStyle(
@@ -224,7 +245,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            /// Active count
+            // Active count
             Text(
               '${accepted.length} / ${members.length} pingpals active',
               style: const TextStyle(
@@ -236,7 +257,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            /// Pingpals list
+            // Pingpals list
             const Text(
               'Pingpals',
               style: TextStyle(
@@ -262,15 +283,15 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
                     if (locationSnap.hasData &&
                         locationSnap.data!.docs.isNotEmpty) {
-                      final locData =
-                      locationSnap.data!.docs.first.data()
-                      as Map<String, dynamic>;
-
-                      status = _getArrivalStatus(
-                        destination: destination,
-                        userLocation: locData['location'],
-                        arrivalTime: arrivalTime,
-                      );
+                      final locRaw = locationSnap.data!.docs.first.data();
+                      if (locRaw is Map<String, dynamic> &&
+                          locRaw['location'] is GeoPoint) {
+                        status = _getArrivalStatus(
+                          destination: destination,
+                          userLocation: locRaw['location'] as GeoPoint,
+                          arrivalTime: arrivalTime,
+                        );
+                      }
                     }
 
                     return _PingpalTile(
@@ -285,7 +306,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            /// Host / Leave buttons
+            // Host / Leave
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
@@ -296,18 +317,15 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
                   side: BorderSide(
                     color: isHost ? Colors.red : Colors.orange,
                   ),
-                  foregroundColor:
-                  isHost ? Colors.red : Colors.orange,
+                  foregroundColor: isHost ? Colors.red : Colors.orange,
                 ),
-                child: Text(
-                  isHost ? 'Cancel Pingtrail' : 'Leave Pingtrail',
-                ),
+                child: Text(isHost ? 'Cancel Pingtrail' : 'Leave Pingtrail'),
               ),
             ),
 
             const SizedBox(height: 12),
 
-            /// Track button
+            // Track
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
@@ -336,8 +354,6 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     );
   }
 }
-
-/// ---------------- Pingpal Tile ----------------
 
 class _PingpalTile extends StatelessWidget {
   final String uid;
@@ -370,15 +386,13 @@ class _PingpalTile extends StatelessWidget {
     }
 
     return FutureBuilder<DocumentSnapshot>(
-      future:
-      FirebaseFirestore.instance.collection('users').doc(uid).get(),
+      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
       builder: (context, snapshot) {
         String displayName = 'Pingpal';
 
-        if (snapshot.hasData && snapshot.data!.data() != null) {
-          final user =
-          snapshot.data!.data() as Map<String, dynamic>;
-          displayName = user['fullName'] ?? 'Pingpal';
+        final raw = snapshot.data?.data();
+        if (raw is Map<String, dynamic>) {
+          displayName = (raw['fullName'] ?? 'Pingpal').toString();
         }
 
         return ListTile(
