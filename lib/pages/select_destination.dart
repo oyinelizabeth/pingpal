@@ -3,6 +3,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:google_places_flutter/model/prediction.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
@@ -32,9 +34,10 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
+  // HELPERS
+
   DateTime? _getArrivalDateTime() {
     if (_selectedDate == null || _selectedTime == null) return null;
-
     return DateTime(
       _selectedDate!.year,
       _selectedDate!.month,
@@ -44,6 +47,14 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     );
   }
 
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  // Create pingtrail
+
   Future<void> _startPingtrail() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -51,12 +62,12 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     final arrivalDateTime = _getArrivalDateTime();
 
     if (_destinationController.text.trim().isEmpty) {
-      _showError('Please enter a destination name');
+      _showError('Please select a destination');
       return;
     }
 
     if (_selectedLatLng == null) {
-      _showError('Please select a destination on the map');
+      _showError('Destination location not set');
       return;
     }
 
@@ -97,14 +108,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     Navigator.popUntil(context, (route) => route.isFirst);
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
+  // UI
 
   @override
   Widget build(BuildContext context) {
@@ -112,31 +116,19 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       backgroundColor: AppTheme.darkBackground,
       body: Stack(
         children: [
-          /// MAP
+
+          /// Map
           GoogleMap(
             initialCameraPosition: const CameraPosition(
-              target: LatLng(51.5074, -0.1278),
+              target: LatLng(51.5074, -0.1278), // London
               zoom: 12,
             ),
             myLocationEnabled: true,
             markers: _markers,
-            onTap: (latLng) {
-              setState(() {
-                _selectedLatLng = latLng;
-                _markers
-                  ..clear()
-                  ..add(
-                    Marker(
-                      markerId: const MarkerId('destination'),
-                      position: latLng,
-                    ),
-                  );
-              });
-            },
             onMapCreated: (controller) => _mapController = controller,
           ),
 
-          /// BACK BUTTON
+          /// Back button
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -153,7 +145,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
             ),
           ),
 
-          /// BOTTOM SHEET
+          /// Bottom sheet
           Positioned(
             bottom: 0,
             left: 0,
@@ -164,133 +156,173 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                 color: AppTheme.cardBackground,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Destination',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textGray,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _destinationController,
-                    style: const TextStyle(color: AppTheme.textWhite),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. Westfield Stratford',
-                      hintStyle: TextStyle(
-                        color: AppTheme.textGray.withOpacity(0.6),
-                      ),
-                      filled: true,
-                      fillColor: AppTheme.inputBackground,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
 
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    'Arrival time',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textGray,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  ListTile(
-                    leading: const Icon(Icons.calendar_today, color: AppTheme.primaryBlue),
-                    title: Text(
-                      _selectedDate == null
-                          ? 'Select date'
-                          : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                      style: const TextStyle(color: AppTheme.textWhite),
-                    ),
-                    onTap: () async {
-                      final pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-
-                      if (pickedDate != null) {
-                        setState(() => _selectedDate = pickedDate);
-                      }
-                    },
-                  ),
-
-                  ListTile(
-                    leading: const Icon(Icons.access_time, color: AppTheme.primaryBlue),
-                    title: Text(
-                      _selectedTime == null
-                          ? 'Select time'
-                          : _selectedTime!.format(context),
-                      style: const TextStyle(color: AppTheme.textWhite),
-                    ),
-                    onTap: () async {
-                      final pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-
-                      if (pickedTime != null) {
-                        setState(() => _selectedTime = pickedTime);
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  ElevatedButton(
-                    onPressed: _startPingtrail,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: const Text(
-                      'Start Pingtrail',
+                    /// Destination
+                    const Text(
+                      'Destination',
                       style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textGray,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+                    const SizedBox(height: 8),
 
-          /// RECENTER
-          Positioned(
-            bottom: 260,
-            right: 16,
-            child: FloatingActionButton(
-              backgroundColor: AppTheme.cardBackground,
-              child: const Icon(
-                FontAwesomeIcons.locationArrow,
-                color: AppTheme.primaryBlue,
+                    GooglePlaceAutoCompleteTextField(
+                      textEditingController: _destinationController,
+                      googleAPIKey: "AIzaSyBQbcJzO-r0747NpMLKOt3ZUQN_1fZEt-g",
+                      debounceTime: 400,
+                      countries: const ["gb"],
+
+                      isLatLngRequired: true,
+
+                      inputDecoration: InputDecoration(
+                        hintText: 'Search destination',
+                        filled: true,
+                        fillColor: AppTheme.inputBackground,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+
+                      /// callback for when lat/lng arrive
+                      getPlaceDetailWithLatLng: (Prediction p) {
+                        if (p.lat == null || p.lng == null) {
+                          debugPrint('Place details loaded but lat/lng missing');
+                          return;
+                        }
+
+                        final double lat = double.parse(p.lat!);
+                        final double lng = double.parse(p.lng!);
+
+                        final LatLng mapLatLng = LatLng(lat, lng);
+
+                        setState(() {
+                          // Show info in text field
+                          _destinationController.text = p.description ?? 'Selected place';
+
+                          // Save destination
+                          _selectedLatLng = mapLatLng;
+
+                          // Show marker on map
+                          _markers
+                            ..clear()
+                            ..add(
+                              Marker(
+                                markerId: const MarkerId('destination'),
+                                position: mapLatLng,
+                                infoWindow: InfoWindow(
+                                  title: p.structuredFormatting?.mainText ?? 'Destination',
+                                  snippet:
+                                  p.structuredFormatting?.secondaryText ?? '',
+                                ),
+                              ),
+                            );
+                        });
+
+                        // Move map
+                        _mapController?.animateCamera(
+                          CameraUpdate.newLatLngZoom(mapLatLng, 14),
+                        );
+
+                        // Close keyboard
+                        FocusScope.of(context).unfocus();
+                      },
+
+                      itemClick: (Prediction p) {
+                      },
+                    ),
+
+
+
+
+                    const SizedBox(height: 4),
+
+                    /// Arrival time
+                    const Text(
+                      'Arrival time',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textGray,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    ListTile(
+                      leading: const Icon(Icons.calendar_today,
+                          color: AppTheme.primaryBlue),
+                      title: Text(
+                        _selectedDate == null
+                            ? 'Select date'
+                            : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                        style:
+                        const TextStyle(color: AppTheme.textWhite),
+                      ),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime.now(),
+                          lastDate:
+                          DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setState(() => _selectedDate = picked);
+                        }
+                      },
+                    ),
+
+                    ListTile(
+                      leading: const Icon(Icons.access_time,
+                          color: AppTheme.primaryBlue),
+                      title: Text(
+                        _selectedTime == null
+                            ? 'Select time'
+                            : _selectedTime!.format(context),
+                        style:
+                        const TextStyle(color: AppTheme.textWhite),
+                      ),
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _selectedTime = picked);
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    /// Create button
+                    ElevatedButton(
+                      onPressed: _startPingtrail,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'Start Pingtrail',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              onPressed: () {
-                if (_selectedLatLng != null) {
-                  _mapController?.animateCamera(
-                    CameraUpdate.newLatLngZoom(_selectedLatLng!, 14),
-                  );
-                }
-              },
             ),
           ),
         ],
@@ -300,5 +332,11 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
         onTap: (_) => Navigator.popUntil(context, (r) => r.isFirst),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    super.dispose();
   }
 }

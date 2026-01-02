@@ -23,9 +23,11 @@ dependencies:
   google_sign_in: ^6.2.1
   firebase_storage: ^13.0.5
 
+
   # Maps + Location
   google_maps_flutter: ^2.7.0
   geolocator: ^13.0.1
+  google_places_flutter: ^2.0.6
 
   # REST API
   http: ^1.2.2
