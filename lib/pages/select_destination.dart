@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -35,7 +38,6 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
   TimeOfDay? _selectedTime;
 
   // HELPERS
-
   DateTime? _getArrivalDateTime() {
     if (_selectedDate == null || _selectedTime == null) return null;
     return DateTime(
@@ -47,13 +49,72 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     );
   }
 
+  double? _distanceKm;
+  String? _estimatedTime;
+  bool _isCalculatingRoute = false;
+  LatLng? _lastRoutedDestination;
+
+  Future<void> _calculateDistanceAndETA(LatLng destination) async {
+    if (_lastRoutedDestination == destination) return;
+    _lastRoutedDestination = destination;
+
+    setState(() {
+      _isCalculatingRoute = true;
+      _estimatedTime = null;
+    });
+
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    /// Estimation
+    final minutes = ((_distanceKm! / 40) * 60).round();
+
+    setState(() {
+      _estimatedTime = '$minutes mins (estimating...)';
+    });
+
+    /// Distance (KM)
+    final meters = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+
+    setState(() {
+      _distanceKm = meters / 1000;
+    });
+
+    /// ETA (Directions API)
+    final url =
+        'https://maps.googleapis.com/maps/api/directions/json'
+        '?origin=${position.latitude},${position.longitude}'
+        '&destination=${destination.latitude},${destination.longitude}'
+        '&mode=driving'
+        '&key=AIzaSyBQbcJzO-r0747NpMLKOt3ZUQN_1fZEt-g';
+
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      if (data['routes'].isNotEmpty) {
+        _estimatedTime =
+        data['routes'][0]['legs'][0]['duration']['text'];
+      }
+    }
+
+    setState(() => _isCalculatingRoute = false);
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
-  // Create pingtrail
+  // Create Pingtrail
 
   Future<void> _startPingtrail() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -230,6 +291,8 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                           CameraUpdate.newLatLngZoom(mapLatLng, 14),
                         );
 
+                        _calculateDistanceAndETA(mapLatLng);
+
                         // Close keyboard
                         FocusScope.of(context).unfocus();
                       },
@@ -238,10 +301,52 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                       },
                     ),
 
-
-
-
                     const SizedBox(height: 4),
+
+                    if (_isCalculatingRoute && _estimatedTime == null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 6),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      ),
+
+
+                    if (_distanceKm != null && _estimatedTime != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.place,
+                                    color: AppTheme.primaryBlue, size: 18),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${_distanceKm!.toStringAsFixed(1)} km away',
+                                  style: const TextStyle(
+                                    color: AppTheme.textWhite,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                const Icon(Icons.directions_car,
+                                    color: AppTheme.primaryBlue, size: 18),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _estimatedTime!,
+                                  style: const TextStyle(
+                                    color: AppTheme.textWhite,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
 
                     /// Arrival time
                     const Text(
