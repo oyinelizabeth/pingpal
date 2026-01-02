@@ -32,7 +32,7 @@ class PingtrailInviteService {
       body: '$hostName invited you to a Pingtrail',
       type: 'pingtrail_invite',
       pingtrailId: pingtrailId,
-      invitationId: invitationRef.id,
+      //invitationId: invitationRef.id,
     );
   }
 }

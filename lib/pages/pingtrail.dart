@@ -265,7 +265,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                         MaterialPageRoute(
                           builder: (_) => ActivePingtrailMapPage(
                             pingtrailId: doc.id,
-                            destination: dest,
+                            //destination: dest,
                           ),
                         ),
                       );
