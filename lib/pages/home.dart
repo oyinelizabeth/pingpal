@@ -30,6 +30,9 @@ class _HomePageState extends State<HomePage> {
   GoogleMapController? _mapController;
   final bool _hasNotifications = true;
 
+  final String _currentUserId =
+      FirebaseAuth.instance.currentUser!.uid;
+
   final List<Widget> _pages = [];
 
   final List<Map<String, dynamic>> friends = [
@@ -114,14 +117,116 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ------------------------ ACTIVE PINGTRAIL OVERVIEW ------------------------
+  Widget _buildActivePingtrailOverview() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('pingtrails')
+          .where('status', isEqualTo: 'active')
+          .where('members', arrayContains: _currentUserId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final docs = snapshot.data!.docs;
+
+        return SizedBox(
+          height: 110,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: docs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+
+              final String title =
+              (data['destinationName'] ?? 'Pingtrail').toString();
+
+              final List members =
+              (data['members'] as List<dynamic>? ?? []);
+
+              return GestureDetector(
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => ActivePingtrailDetailsSheet(
+                      doc: doc,
+                      currentUserId: _currentUserId,
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 220,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardBackground.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppTheme.borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: AppTheme.primaryBlue,
+                        size: 22,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.textWhite,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        members.length == 1
+                            ? '1 pingpal'
+                            : '${members.length} pingpals',
+                        style: const TextStyle(
+                          color: AppTheme.textGray,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   // ------------------------ MAP VIEW ------------------------
   Widget _buildMapView() {
     return Stack(
       children: [
+        // Full-screen Map with ACTIVE PINGTRAILS
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('pingtrails')
               .where('status', isEqualTo: 'active')
+              .where('members', arrayContains: _currentUserId)
               .snapshots(),
           builder: (context, snapshot) {
             final Set<Marker> markers = {
@@ -132,8 +237,6 @@ class _HomePageState extends State<HomePage> {
               ),
             };
 
-            final Set<Circle> circles = {};
-
             if (snapshot.hasData) {
               for (final doc in snapshot.data!.docs) {
                 final data = doc.data() as Map<String, dynamic>;
@@ -141,59 +244,19 @@ class _HomePageState extends State<HomePage> {
                 if (data['destination'] is! GeoPoint) continue;
 
                 final GeoPoint dest = data['destination'];
-                final LatLng destLatLng =
-                LatLng(dest.latitude, dest.longitude);
-
                 final String title =
                 (data['destinationName'] ?? 'Pingtrail').toString();
-
-                final List<String> members =
-                (data['members'] as List<dynamic>? ?? [])
-                    .whereType<String>()
-                    .toList();
-
-                final int memberCount = members.length;
-
-                final String memberText = memberCount == 1
-                    ? '1 pingpal heading here'
-                    : '$memberCount pingpals heading here';
-
-                String etaText = '';
-
-                if (data['arrivalTime'] is Timestamp) {
-                  final DateTime arrivalTime =
-                  (data['arrivalTime'] as Timestamp).toDate();
-
-                  final Duration diff =
-                  arrivalTime.difference(DateTime.now());
-
-                  if (diff.inMinutes > 0 && diff.inMinutes <= 30) {
-                    etaText =
-                    '\nArrive by ${TimeOfDay.fromDateTime(arrivalTime).format(context)}';
-                  }
-                }
-
-                circles.add(
-                  Circle(
-                    circleId: CircleId('pulse_${doc.id}'),
-                    center: destLatLng,
-                    radius: 90,
-                    fillColor: AppTheme.primaryBlue.withOpacity(0.15),
-                    strokeColor: AppTheme.primaryBlue.withOpacity(0.4),
-                    strokeWidth: 2,
-                  ),
-                );
 
                 markers.add(
                   Marker(
                     markerId: MarkerId('pingtrail_${doc.id}'),
-                    position: destLatLng,
+                    position: LatLng(dest.latitude, dest.longitude),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure,
                     ),
                     infoWindow: InfoWindow(
                       title: title,
-                      snippet: '$memberText$etaText',
+                      snippet: 'Active Pingtrail',
                       onTap: () {
                         showModalBottomSheet(
                           context: context,
@@ -201,8 +264,7 @@ class _HomePageState extends State<HomePage> {
                           backgroundColor: Colors.transparent,
                           builder: (_) => ActivePingtrailDetailsSheet(
                             doc: doc,
-                            currentUserId:
-                            FirebaseAuth.instance.currentUser!.uid,
+                            currentUserId: _currentUserId,
                           ),
                         );
                       },
@@ -225,7 +287,6 @@ class _HomePageState extends State<HomePage> {
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               markers: markers,
-              circles: circles,
             );
           },
         ),
@@ -286,6 +347,14 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+        ),
+
+        // Active Pingtrails Overview (Horizontal Cards)
+        Positioned(
+          bottom: 160,
+          left: 0,
+          right: 0,
+          child: _buildActivePingtrailOverview(),
         ),
 
         // Floating Action Buttons

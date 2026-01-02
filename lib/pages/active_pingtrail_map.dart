@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../theme/app_theme.dart';
@@ -32,14 +31,6 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   bool _hasArrived = false;
   bool _isArriving = false;
   String _currentUserName = 'A user';
-
-  // ───────── POLYLINE STATE ─────────
-  final Set<Polyline> _polylines = {};
-  final PolylinePoints _polylinePoints = PolylinePoints();
-  LatLng? _lastRouteOrigin;
-
-  static const String _googleApiKey =
-      'AIzaSyDLHq8J0RZKNvtgVImOmNicP4QuWCivQyc';
 
   // ─────────────────────────────
   // Lifecycle
@@ -163,109 +154,6 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   }
 
   // ─────────────────────────────
-  // HYBRID ROUTE (YOU)
-  // ─────────────────────────────
-  Future<void> _drawHybridRoute({
-    required LatLng origin,
-    required LatLng destination,
-  }) async {
-    if (_lastRouteOrigin != null) {
-      final moved = Geolocator.distanceBetween(
-        _lastRouteOrigin!.latitude,
-        _lastRouteOrigin!.longitude,
-        origin.latitude,
-        origin.longitude,
-      );
-      if (moved < 30) return;
-    }
-    _lastRouteOrigin = origin;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      setState(() {
-        _polylines
-          ..removeWhere(
-                (p) => p.polylineId.value == 'fallback' ||
-                p.polylineId.value == 'route',
-          )
-          ..add(
-            Polyline(
-              polylineId: const PolylineId('fallback'),
-              color: AppTheme.primaryBlue,
-              width: 6,
-              points: [origin, destination],
-            ),
-          );
-      });
-    });
-
-    try {
-      final result = await _polylinePoints.getRouteBetweenCoordinates(
-        googleApiKey: _googleApiKey,
-        request: PolylineRequest(
-          origin: PointLatLng(origin.latitude, origin.longitude),
-          destination:
-          PointLatLng(destination.latitude, destination.longitude),
-          mode: TravelMode.driving,
-        ),
-      );
-
-      if (result.points.isEmpty) return;
-
-      final routePoints = result.points
-          .map((p) => LatLng(p.latitude, p.longitude))
-          .toList();
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-
-        setState(() {
-          _polylines
-            ..removeWhere(
-                  (p) => p.polylineId.value == 'fallback' ||
-                  p.polylineId.value == 'route',
-            )
-            ..add(
-              Polyline(
-                polylineId: const PolylineId('route'),
-                color: AppTheme.primaryBlue,
-                width: 6,
-                points: routePoints,
-              ),
-            );
-        });
-      });
-    } catch (_) {}
-  }
-
-  // ─────────────────────────────
-  // STRAIGHT LINE (OTHER MEMBERS)
-  // ─────────────────────────────
-  void _addMemberLine({
-    required String uid,
-    required LatLng origin,
-    required LatLng destination,
-  }) {
-    final id = PolylineId('member_$uid');
-
-    if (!mounted) return;
-
-    setState(() {
-      _polylines.removeWhere((p) => p.polylineId == id);
-
-      _polylines.add(
-        Polyline(
-          polylineId: id,
-          points: [origin, destination],
-          color: AppTheme.primaryBlue.withOpacity(0.35),
-          width: 4,
-        ),
-      );
-    });
-  }
-
-  // ─────────────────────────────
   // UI
   // ─────────────────────────────
   @override
@@ -326,15 +214,15 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                 builder: (context, snapshot) {
                   final Set<Marker> markers = {
                     Marker(
-                      markerId:
-                      const MarkerId('destination'),
+                      markerId: const MarkerId('destination'),
                       position: destination,
-                      icon:
-                      BitmapDescriptor.defaultMarkerWithHue(
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
                         BitmapDescriptor.hueGreen,
                       ),
                     ),
                   };
+
+                  final Set<Polyline> polylines = {};
 
                   if (snapshot.hasData) {
                     for (final doc in snapshot.data!.docs) {
@@ -342,21 +230,32 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                       doc.data() as Map<String, dynamic>;
                       if (raw['location'] is! GeoPoint) continue;
 
-                      final GeoPoint locGp = raw['location'];
+                      final GeoPoint gp = raw['location'];
                       final LatLng loc =
-                      LatLng(locGp.latitude, locGp.longitude);
+                      LatLng(gp.latitude, gp.longitude);
                       final String uid = doc.id;
 
+                      // YOU → destination
                       if (uid == currentUserId) {
-                        _drawHybridRoute(
-                          origin: loc,
-                          destination: destination,
+                        polylines.add(
+                          Polyline(
+                            polylineId: const PolylineId('you'),
+                            points: [loc, destination],
+                            color: AppTheme.primaryBlue,
+                            width: 6,
+                          ),
                         );
                       } else {
-                        _addMemberLine(
-                          uid: uid,
-                          origin: loc,
-                          destination: destination,
+                        // OTHER MEMBERS → destination
+                        polylines.add(
+                          Polyline(
+                            polylineId:
+                            PolylineId('member_$uid'),
+                            points: [loc, destination],
+                            color: AppTheme.primaryBlue
+                                .withOpacity(0.35),
+                            width: 4,
+                          ),
                         );
                       }
 
@@ -381,7 +280,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                       zoom: 13,
                     ),
                     markers: markers,
-                    polylines: _polylines,
+                    polylines: polylines,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: true,
                     onMapCreated: (c) =>
@@ -414,8 +313,10 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                   top: 20,
                   right: 20,
                   child: IconButton(
-                    icon: const Icon(Icons.close,
-                        color: Colors.red),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.red,
+                    ),
                     onPressed: () => _cancelPingtrail(
                       hostId,
                       trailName,
