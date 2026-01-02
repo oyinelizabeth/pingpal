@@ -118,7 +118,6 @@ class _HomePageState extends State<HomePage> {
   Widget _buildMapView() {
     return Stack(
       children: [
-        // Full-screen Map with ACTIVE PINGTRAILS
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('pingtrails')
@@ -133,6 +132,8 @@ class _HomePageState extends State<HomePage> {
               ),
             };
 
+            final Set<Circle> circles = {};
+
             if (snapshot.hasData) {
               for (final doc in snapshot.data!.docs) {
                 final data = doc.data() as Map<String, dynamic>;
@@ -140,19 +141,59 @@ class _HomePageState extends State<HomePage> {
                 if (data['destination'] is! GeoPoint) continue;
 
                 final GeoPoint dest = data['destination'];
+                final LatLng destLatLng =
+                LatLng(dest.latitude, dest.longitude);
+
                 final String title =
                 (data['destinationName'] ?? 'Pingtrail').toString();
+
+                final List<String> members =
+                (data['members'] as List<dynamic>? ?? [])
+                    .whereType<String>()
+                    .toList();
+
+                final int memberCount = members.length;
+
+                final String memberText = memberCount == 1
+                    ? '1 pingpal heading here'
+                    : '$memberCount pingpals heading here';
+
+                String etaText = '';
+
+                if (data['arrivalTime'] is Timestamp) {
+                  final DateTime arrivalTime =
+                  (data['arrivalTime'] as Timestamp).toDate();
+
+                  final Duration diff =
+                  arrivalTime.difference(DateTime.now());
+
+                  if (diff.inMinutes > 0 && diff.inMinutes <= 30) {
+                    etaText =
+                    '\nArrive by ${TimeOfDay.fromDateTime(arrivalTime).format(context)}';
+                  }
+                }
+
+                circles.add(
+                  Circle(
+                    circleId: CircleId('pulse_${doc.id}'),
+                    center: destLatLng,
+                    radius: 90,
+                    fillColor: AppTheme.primaryBlue.withOpacity(0.15),
+                    strokeColor: AppTheme.primaryBlue.withOpacity(0.4),
+                    strokeWidth: 2,
+                  ),
+                );
 
                 markers.add(
                   Marker(
                     markerId: MarkerId('pingtrail_${doc.id}'),
-                    position: LatLng(dest.latitude, dest.longitude),
+                    position: destLatLng,
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure,
                     ),
                     infoWindow: InfoWindow(
                       title: title,
-                      snippet: 'Active Pingtrail',
+                      snippet: '$memberText$etaText',
                       onTap: () {
                         showModalBottomSheet(
                           context: context,
@@ -184,6 +225,7 @@ class _HomePageState extends State<HomePage> {
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               markers: markers,
+              circles: circles,
             );
           },
         ),
