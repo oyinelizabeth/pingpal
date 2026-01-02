@@ -27,6 +27,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   final PingtrailService _pingtrailService = PingtrailService();
 
   GoogleMapController? _mapController;
+  bool _cameraFitted = false;
 
   bool _hasArrived = false;
   bool _isArriving = false;
@@ -59,6 +60,40 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   void dispose() {
     LiveLocationService.stop();
     super.dispose();
+  }
+
+  // ─────────────────────────────
+  // Helpers
+  // ─────────────────────────────
+  bool _isActive(Timestamp? updatedAt) {
+    if (updatedAt == null) return false;
+    return DateTime.now()
+        .difference(updatedAt.toDate())
+        .inMinutes <=
+        3;
+  }
+
+  Future<void> _fitCamera(Set<LatLng> points) async {
+    if (_mapController == null || points.isEmpty) return;
+
+    double? minLat, maxLat, minLng, maxLng;
+
+    for (final p in points) {
+      minLat = minLat == null ? p.latitude : minLat < p.latitude ? minLat : p.latitude;
+      maxLat = maxLat == null ? p.latitude : maxLat > p.latitude ? maxLat : p.latitude;
+      minLng = minLng == null ? p.longitude : minLng < p.longitude ? minLng : p.longitude;
+      maxLng = maxLng == null ? p.longitude : maxLng > p.longitude ? maxLng : p.longitude;
+    }
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat!, minLng!),
+          northeast: LatLng(maxLat!, maxLng!),
+        ),
+        80,
+      ),
+    );
   }
 
   // ─────────────────────────────
@@ -109,10 +144,6 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Arrival confirmed 🎉')),
-      );
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to confirm arrival')),
       );
     } finally {
       if (mounted) setState(() => _isArriving = false);
@@ -180,10 +211,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
           if (trail['destination'] is! GeoPoint) {
             return const Center(
-              child: Text(
-                'Destination not set',
-                style: TextStyle(color: Colors.white),
-              ),
+              child: Text('Destination not set',
+                  style: TextStyle(color: Colors.white)),
             );
           }
 
@@ -198,10 +227,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
           final String hostId =
           (trail['creatorId'] ?? '').toString();
-
           final String trailName =
-          (trail['destinationName'] ?? 'Pingtrail')
-              .toString();
+          (trail['destinationName'] ?? 'Pingtrail').toString();
 
           return Stack(
             children: [
@@ -223,6 +250,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                   };
 
                   final Set<Polyline> polylines = {};
+                  final Set<LatLng> activePoints = {destination};
 
                   if (snapshot.hasData) {
                     for (final doc in snapshot.data!.docs) {
@@ -235,56 +263,55 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                       LatLng(gp.latitude, gp.longitude);
                       final String uid = doc.id;
 
-                      // YOU → destination
-                      if (uid == currentUserId) {
-                        polylines.add(
-                          Polyline(
-                            polylineId: const PolylineId('you'),
-                            points: [loc, destination],
-                            color: AppTheme.primaryBlue,
-                            width: 6,
-                          ),
-                        );
-                      } else {
-                        // OTHER MEMBERS → destination
-                        polylines.add(
-                          Polyline(
-                            polylineId:
-                            PolylineId('member_$uid'),
-                            points: [loc, destination],
-                            color: AppTheme.primaryBlue
-                                .withOpacity(0.35),
-                            width: 4,
-                          ),
-                        );
-                      }
+                      final bool active =
+                      _isActive(raw['updatedAt'] as Timestamp?);
+
+                      if (active) activePoints.add(loc);
+
+                      polylines.add(
+                        Polyline(
+                          polylineId: PolylineId(uid),
+                          points: [loc, destination],
+                          color: uid == currentUserId
+                              ? AppTheme.primaryBlue
+                              : AppTheme.primaryBlue.withOpacity(0.35),
+                          width: uid == currentUserId ? 6 : 4,
+                        ),
+                      );
 
                       markers.add(
                         Marker(
                           markerId: MarkerId(uid),
                           position: loc,
-                          icon:
-                          BitmapDescriptor.defaultMarkerWithHue(
+                          icon: BitmapDescriptor.defaultMarkerWithHue(
                             uid == currentUserId
                                 ? BitmapDescriptor.hueAzure
-                                : BitmapDescriptor.hueRed,
+                                : active
+                                ? BitmapDescriptor.hueRed
+                                : BitmapDescriptor.hueOrange,
                           ),
                         ),
                       );
                     }
                   }
 
+                  if (!_cameraFitted &&
+                      _mapController != null &&
+                      activePoints.length > 1) {
+                    _cameraFitted = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _fitCamera(activePoints);
+                    });
+                  }
+
                   return GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: destination,
-                      zoom: 13,
-                    ),
+                    initialCameraPosition:
+                    CameraPosition(target: destination, zoom: 13),
                     markers: markers,
                     polylines: polylines,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: true,
-                    onMapCreated: (c) =>
-                    _mapController = c,
+                    onMapCreated: (c) => _mapController = c,
                   );
                 },
               ),
@@ -294,11 +321,9 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                 right: 20,
                 bottom: 20,
                 child: ElevatedButton.icon(
-                  onPressed:
-                  _hasArrived || _isArriving
+                  onPressed: _hasArrived || _isArriving
                       ? null
-                      : () =>
-                      _onArrivedPressed(members),
+                      : () => _onArrivedPressed(members),
                   icon: const Icon(Icons.flag),
                   label: Text(
                     _hasArrived
@@ -313,15 +338,10 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                   top: 20,
                   right: 20,
                   child: IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.red,
-                    ),
-                    onPressed: () => _cancelPingtrail(
-                      hostId,
-                      trailName,
-                      members,
-                    ),
+                    icon:
+                    const Icon(Icons.close, color: Colors.red),
+                    onPressed: () =>
+                        _cancelPingtrail(hostId, trailName, members),
                   ),
                 ),
             ],
