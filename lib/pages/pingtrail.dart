@@ -252,7 +252,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 // Active Pingtrail Section
                 const Text(
-                  'Active Pingtrail',
+                  'Active Pingtrails',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
@@ -262,30 +262,40 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 const SizedBox(height: 16),
 
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('pingtrails')
-                  .where('members', arrayContains: currentUserId)
-                  .where('status', isEqualTo: 'active')
-                  .limit(1)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('pingtrails')
+                      .where('members', arrayContains: currentUserId)
+                      .where('status', isEqualTo: 'active')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                if (snapshot.data!.docs.isEmpty) {
-                  return _buildNoActivePingtrail();
-                }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return _buildNoActivePingtrail();
+                    }
 
-                final doc = snapshot.data!.docs.first;
+                    final docs = snapshot.data!.docs;
 
-                return ActivePingtrailCard(
-                  doc: doc,
-                  onTap: () => _openActivePingtrailPopup(doc),
-                );
-              },
-            ),
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: docs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final doc = docs[index];
+
+                        return ActivePingtrailCard(
+                          doc: doc,
+                          onTap: () => _openActivePingtrailPopup(doc),
+                        );
+                      },
+                    );
+                  },
+                ),
 
                 // Pending Pingtrails Section
                 const Text(

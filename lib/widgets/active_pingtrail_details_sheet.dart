@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
 import '../theme/app_theme.dart';
 import '../pages/active_pingtrail_map.dart';
+
+enum ArrivalStatus { arrived, enRoute, late }
 
 class ActivePingtrailDetailsSheet extends StatelessWidget {
   final QueryDocumentSnapshot doc;
@@ -14,14 +16,39 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     required this.currentUserId,
   });
 
+  ArrivalStatus _getArrivalStatus({
+    required GeoPoint destination,
+    required GeoPoint userLocation,
+    required DateTime arrivalTime,
+  }) {
+    final now = DateTime.now();
+
+    final distance = Geolocator.distanceBetween(
+      userLocation.latitude,
+      userLocation.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+
+    if (distance <= 50) return ArrivalStatus.arrived;
+    if (now.isAfter(arrivalTime)) return ArrivalStatus.late;
+
+    return ArrivalStatus.enRoute;
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = doc.data() as Map<String, dynamic>;
 
+    final String pingtrailId = doc.id;
     final String trailName = data['name'] ?? 'Pingtrail';
     final String destinationName = data['destinationName'] ?? '';
     final GeoPoint destination = data['destination'];
-    final List<String> members = List<String>.from(data['members'] ?? []);
+    final DateTime arrivalTime =
+    (data['arrivalTime'] as Timestamp).toDate();
+
+    final List<String> members =
+    List<String>.from(data['members'] ?? []);
     final List<String> accepted =
     List<String>.from(data['acceptedMembers'] ?? []);
 
@@ -70,6 +97,18 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(height: 12),
+
+            /// Arrival time
+            Text(
+              'Arrive by ${TimeOfDay.fromDateTime(arrivalTime).format(context)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryBlue,
+              ),
+            ),
+
             const SizedBox(height: 16),
 
             /// Accepted count
@@ -96,9 +135,41 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            _ActivePingtrailMembersList(
-              memberIds: members,
-              acceptedIds: accepted,
+            Column(
+              children: members.map((uid) {
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('user_locations')
+                      .where('pingtrailId', isEqualTo: pingtrailId)
+                      .where('uid', isEqualTo: uid)
+                      .limit(1)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    ArrivalStatus? status;
+
+                    if (snapshot.hasData &&
+                        snapshot.data!.docs.isNotEmpty) {
+                      final locData = snapshot.data!.docs.first.data()
+                      as Map<String, dynamic>;
+
+                      final GeoPoint userLocation =
+                      locData['location'];
+
+                      status = _getArrivalStatus(
+                        destination: destination,
+                        userLocation: userLocation,
+                        arrivalTime: arrivalTime,
+                      );
+                    }
+
+                    return _PingpalTile(
+                      uid: uid,
+                      isAccepted: accepted.contains(uid),
+                      status: status,
+                    );
+                  },
+                );
+              }).toList(),
             ),
 
             const SizedBox(height: 28),
@@ -106,12 +177,12 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
             /// Track button
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pop(context); // close bottom sheet
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ActivePingtrailMapPage(
-                      pingtrailId: doc.id,
+                      pingtrailId: pingtrailId,
                       destination: destination,
                     ),
                   ),
@@ -134,69 +205,66 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
   }
 }
 
-/// -----------------------------
-/// MEMBERS LIST
-/// -----------------------------
-class _ActivePingtrailMembersList extends StatelessWidget {
-  final List<String> memberIds;
-  final List<String> acceptedIds;
 
-  const _ActivePingtrailMembersList({
-    required this.memberIds,
-    required this.acceptedIds,
+/// Live Status
+
+class _PingpalTile extends StatelessWidget {
+  final String uid;
+  final bool isAccepted;
+  final ArrivalStatus? status;
+
+  const _PingpalTile({
+    required this.uid,
+    required this.isAccepted,
+    required this.status,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (memberIds.isEmpty) {
-      return const Text(
-        'No pingpals',
-        style: TextStyle(color: AppTheme.textGray),
-      );
+    Color statusColor;
+    String statusText;
+
+    switch (status) {
+      case ArrivalStatus.arrived:
+        statusColor = Colors.green;
+        statusText = 'Arrived';
+        break;
+      case ArrivalStatus.late:
+        statusColor = Colors.red;
+        statusText = 'Late';
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusText = 'En route';
     }
 
-    return FutureBuilder<QuerySnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('users')
-          .where(
-        FieldPath.documentId,
-        whereIn: memberIds.take(10).toList(),
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const CircleAvatar(
+        backgroundColor: AppTheme.inputBackground,
+        child: Icon(Icons.person),
+      ),
+      title: Text(
+        uid,
+        style: const TextStyle(color: AppTheme.textWhite),
+      ),
+      subtitle: isAccepted
+          ? Text(
+        statusText,
+        style: TextStyle(
+          color: statusColor,
+          fontWeight: FontWeight.w600,
+        ),
       )
-          .get(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const LinearProgressIndicator();
-        }
-
-        return Column(
-          children: snapshot.data!.docs.map((doc) {
-            final user = doc.data() as Map<String, dynamic>;
-            final bool isActive = acceptedIds.contains(doc.id);
-
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: user['photoUrl'] != null &&
-                    user['photoUrl'].toString().isNotEmpty
-                    ? NetworkImage(user['photoUrl'])
-                    : null,
-                backgroundColor: AppTheme.inputBackground,
-                child: user['photoUrl'] == null
-                    ? const Icon(Icons.person)
-                    : null,
-              ),
-              title: Text(
-                user['fullName'] ?? 'Pingpal',
-                style: const TextStyle(color: AppTheme.textWhite),
-              ),
-              trailing: Icon(
-                isActive ? Icons.circle : Icons.circle_outlined,
-                size: 14,
-                color: isActive ? Colors.green : AppTheme.textGray,
-              ),
-            );
-          }).toList(),
-        );
-      },
+          : const Text(
+        'Pending',
+        style: TextStyle(color: AppTheme.textGray),
+      ),
+      trailing: Icon(
+        Icons.circle,
+        size: 12,
+        color: isAccepted ? statusColor : AppTheme.textGray,
+      ),
     );
   }
 }

@@ -22,23 +22,51 @@ class SelectDestinationPage extends StatefulWidget {
 
 class _SelectDestinationPageState extends State<SelectDestinationPage> {
   final int _navIndex = 0;
+
   final TextEditingController _destinationController = TextEditingController();
 
   GoogleMapController? _mapController;
   LatLng? _selectedLatLng;
   final Set<Marker> _markers = {};
 
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
+
+  DateTime? _getArrivalDateTime() {
+    if (_selectedDate == null || _selectedTime == null) return null;
+
+    return DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
+    );
+  }
+
   Future<void> _startPingtrail() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    final arrivalDateTime = _getArrivalDateTime();
+
     if (_destinationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a destination name'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showError('Please enter a destination name');
+      return;
+    }
+
+    if (_selectedLatLng == null) {
+      _showError('Please select a destination on the map');
+      return;
+    }
+
+    if (arrivalDateTime == null) {
+      _showError('Please select an arrival date and time');
+      return;
+    }
+
+    if (arrivalDateTime.isBefore(DateTime.now())) {
+      _showError('Arrival time must be in the future');
       return;
     }
 
@@ -46,11 +74,11 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       'hostId': user.uid,
       'name': widget.trailName,
       'destinationName': _destinationController.text.trim(),
-      if (_selectedLatLng != null)
-        'destination': GeoPoint(
-          _selectedLatLng!.latitude,
-          _selectedLatLng!.longitude,
-        ),
+      'destination': GeoPoint(
+        _selectedLatLng!.latitude,
+        _selectedLatLng!.longitude,
+      ),
+      'arrivalTime': Timestamp.fromDate(arrivalDateTime.toUtc()),
       'members': [user.uid, ...widget.selectedFriends],
       'acceptedMembers': [user.uid],
       'status': 'pending',
@@ -69,6 +97,15 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     Navigator.popUntil(context, (route) => route.isFirst);
   }
 
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,7 +115,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
           /// MAP
           GoogleMap(
             initialCameraPosition: const CameraPosition(
-              target: LatLng(51.5074, -0.1278), // London
+              target: LatLng(51.5074, -0.1278),
               zoom: 12,
             ),
             myLocationEnabled: true,
@@ -99,28 +136,24 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
             onMapCreated: (controller) => _mapController = controller,
           ),
 
-          /// TOP BAR
+          /// BACK BUTTON
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: AppTheme.cardBackground,
-                    child: IconButton(
-                      icon: const Icon(
-                        FontAwesomeIcons.arrowLeft,
-                        color: AppTheme.textWhite,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                    ),
+              child: CircleAvatar(
+                backgroundColor: AppTheme.cardBackground,
+                child: IconButton(
+                  icon: const Icon(
+                    FontAwesomeIcons.arrowLeft,
+                    color: AppTheme.textWhite,
                   ),
-                ],
+                  onPressed: () => Navigator.pop(context),
+                ),
               ),
             ),
           ),
 
-          /// DESTINATION INPUT SHEET
+          /// BOTTOM SHEET
           Positioned(
             bottom: 0,
             left: 0,
@@ -160,7 +193,64 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 16),
+
+                  const Text(
+                    'Arrival time',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textGray,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  ListTile(
+                    leading: const Icon(Icons.calendar_today, color: AppTheme.primaryBlue),
+                    title: Text(
+                      _selectedDate == null
+                          ? 'Select date'
+                          : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                      style: const TextStyle(color: AppTheme.textWhite),
+                    ),
+                    onTap: () async {
+                      final pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+
+                      if (pickedDate != null) {
+                        setState(() => _selectedDate = pickedDate);
+                      }
+                    },
+                  ),
+
+                  ListTile(
+                    leading: const Icon(Icons.access_time, color: AppTheme.primaryBlue),
+                    title: Text(
+                      _selectedTime == null
+                          ? 'Select time'
+                          : _selectedTime!.format(context),
+                      style: const TextStyle(color: AppTheme.textWhite),
+                    ),
+                    onTap: () async {
+                      final pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+
+                      if (pickedTime != null) {
+                        setState(() => _selectedTime = pickedTime);
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
                   ElevatedButton(
                     onPressed: _startPingtrail,
                     style: ElevatedButton.styleFrom(
@@ -184,9 +274,9 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
             ),
           ),
 
-          /// RECENTER BUTTON
+          /// RECENTER
           Positioned(
-            bottom: 220,
+            bottom: 260,
             right: 16,
             child: FloatingActionButton(
               backgroundColor: AppTheme.cardBackground,
