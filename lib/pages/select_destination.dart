@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
@@ -33,10 +34,19 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
   GoogleMapController? _mapController;
   LatLng? _selectedLatLng;
   final Set<Marker> _markers = {};
-
+  final FlutterLocalNotificationsPlugin _localNotifications =
+  FlutterLocalNotificationsPlugin();
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
+  @override
+  void initState() {
+    super.initState();
 
+    // Initialize local notifications
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const initSettings = InitializationSettings(android: androidSettings);
+    _localNotifications.initialize(initSettings);
+  }
   // HELPERS
   DateTime? _getArrivalDateTime() {
     if (_selectedDate == null || _selectedTime == null) return null;
@@ -123,6 +133,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     final arrivalDateTime = _getArrivalDateTime();
 
     if (_destinationController.text.trim().isEmpty) {
+      if (!mounted) return;
       _showError('Please select a destination');
       return;
     }
@@ -142,7 +153,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       return;
     }
 
-    await FirebaseFirestore.instance.collection('pingtrails').add({
+    final docRef = await FirebaseFirestore.instance.collection('pingtrails').add({
       'hostId': user.uid,
       'name': widget.trailName,
       'destinationName': _destinationController.text.trim(),
@@ -158,7 +169,24 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       'startedAt': null,
       'endedAt': null,
     });
+    if (!mounted) return; // <<< check here
 
+    // Show local notification
+    await _localNotifications.show(
+      docRef.hashCode,
+      'Pingtrail Created!',
+      'Invite sent to ${widget.selectedFriends.length} pingpals',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'default_notification_channel',
+          'Default Notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
+    );
+
+    if (!mounted) return; // <<< check here again
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Pingtrail created! Waiting for pingpals...'),
@@ -168,7 +196,11 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
 
     Navigator.popUntil(context, (route) => route.isFirst);
   }
-
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    super.dispose();
+  }
   // UI
 
   @override
@@ -437,11 +469,5 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
         onTap: (_) => Navigator.popUntil(context, (r) => r.isFirst),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _destinationController.dispose();
-    super.dispose();
   }
 }

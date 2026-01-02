@@ -4,12 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
-import '../widgets/navbar.dart';
 import 'active_pingtrail_map.dart';
 import 'create_pingtrail.dart';
 import 'pingtrails_history.dart';
-import 'pingpals.dart';
-import 'chat_list.dart';
 import '../widgets/pending_pingtrail_sheet.dart';
 import '../widgets/active_pingtrail_details_sheet.dart';
 import '../widgets/pingtrail_avatar_row.dart';
@@ -41,30 +38,59 @@ class _PingtrailPageState extends State<PingtrailPage> {
   // Accept Pingtrail
   Future<void> acceptPingtrail(String pingtrailId) async {
     final uid = currentUserId;
-    final ref =
-    FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    final ref = FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
 
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final data = snap.data()!;
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
 
-      final members = List<String>.from(data['members']);
-      final accepted = List<String>.from(data['acceptedMembers']);
+        if (!snap.exists) {
+          throw Exception("Pingtrail not found");
+        }
 
-      // Add user if not already accepted
-      if (!accepted.contains(uid)) {
-        accepted.add(uid);
-      }
+        final data = snap.data()!;
+        final members = List<String>.from(data['members'] ?? []);
+        final accepted = List<String>.from(data['acceptedMembers'] ?? []);
+        final hostId = data['hostId'] ?? '';
 
-      final bool everyoneAccepted = accepted.length == members.length;
+        // Add current user to accepted list if not already
+        if (!accepted.contains(uid)) {
+          accepted.add(uid);
+        }
 
-      tx.update(ref, {
-        'acceptedMembers': accepted,
-        'status': everyoneAccepted ? 'active' : 'pending',
-        'startedAt':
-        everyoneAccepted ? FieldValue.serverTimestamp() : null,
+        // Check if everyone accepted
+        final bool everyoneAccepted = accepted.length == members.length;
+
+        // Update the document
+        tx.update(ref, {
+          'acceptedMembers': accepted,
+          'status': everyoneAccepted ? 'active' : 'pending',
+          'startedAt': everyoneAccepted ? FieldValue.serverTimestamp() : null,
+        });
+
+        // Optional: trigger notification to host
+        if (!accepted.contains(hostId) && uid != hostId) {
+          final hostSnap = await FirebaseFirestore.instance.collection('users').doc(hostId).get();
+          final hostData = hostSnap.data();
+          final fcmToken = hostData?['fcmToken'];
+
+          if (fcmToken != null) {
+            // Send notification using FCM
+            await FirebaseFirestore.instance.collection('notifications').add({
+              'to': hostId,
+              'fcmToken': fcmToken,
+              'title': 'Pingtrail Accepted ✅',
+              'body': '${data['name'] ?? 'A pingtrail'} has been accepted by a member',
+              'pingtrailId': pingtrailId,
+              'timestamp': FieldValue.serverTimestamp(),
+            });
+          }
+        }
       });
-    });
+    } catch (e) {
+      print("Error accepting pingtrail: $e");
+      rethrow;
+    }
   }
 
   // Decline Pingtrail

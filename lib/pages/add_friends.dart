@@ -16,6 +16,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
   Map<String, dynamic>? foundUser;
   bool isLoading = false;
   bool isSending = false;
+  bool requestSent = false;
 
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
@@ -37,6 +38,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     setState(() {
       isLoading = true;
       foundUser = null;
+      requestSent = false;
     });
 
     final query = await FirebaseFirestore.instance
@@ -90,7 +92,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   // 📤 SEND FRIEND REQUEST
   Future<void> sendFriendRequest() async {
-    if (foundUser == null || isSending) return;
+    if (foundUser == null || isSending || requestSent) return;
 
     setState(() {
       isSending = true;
@@ -127,9 +129,9 @@ class _AddFriendPageState extends State<AddFriendPage> {
     _showMessage('Friend request sent');
 
     setState(() {
-      foundUser = null;
-      emailController.clear();
+      requestSent = true;
       isSending = false;
+      emailController.clear();
     });
   }
 
@@ -261,7 +263,8 @@ class _AddFriendPageState extends State<AddFriendPage> {
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: isSending ? null : sendFriendRequest,
+                      onPressed:
+                      (isSending || requestSent) ? null : sendFriendRequest,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryBlue,
                       ),
@@ -274,7 +277,12 @@ class _AddFriendPageState extends State<AddFriendPage> {
                           color: Colors.white,
                         ),
                       )
-                          : const Text('Send'),
+                          : Text(
+                        requestSent ? 'Sent' : 'Send',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),

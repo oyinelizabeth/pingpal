@@ -25,26 +25,6 @@ class _WelcomePageState extends State<WelcomePage>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
-    _checkLoginStatus();
-  }
-
-  Future<void> _checkLoginStatus() async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    // Add a short delay for splash animation
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-
-    // Schedule navigation after the first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (user != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
-      }
-    });
   }
 
   @override
