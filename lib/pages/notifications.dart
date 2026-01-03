@@ -45,7 +45,9 @@ class _NotificationsPageState extends State<NotificationsPage>
         .orderBy('createdAt', descending: true);
 
     if (types != null && types.isNotEmpty) {
-      query = query.where('type', whereIn: types);
+      // Ensure 'pingtrail_invitation' is handled correctly in filters
+      final List<String> filteredTypes = types.map((t) => t == 'pingtrail_invite' ? 'pingtrail_invitation' : t).toList();
+      query = query.where('type', whereIn: filteredTypes);
     }
 
     return query.snapshots();
@@ -138,42 +140,110 @@ class _NotificationsPageState extends State<NotificationsPage>
       String notificationId,
       ) async {
     final ref =
-    FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
 
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final data = snap.data()!;
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) return;
 
-      final accepted =
-      List<String>.from(data['acceptedMembers'] ?? []);
-      final members = List<String>.from(data['members']);
+        final data = snap.data()!;
+        final List<dynamic> participants = List.from(data['participants'] ?? []);
+        final List<String> members = List<String>.from(data['members'] ?? []);
+        final String hostId = data['hostId'] ?? '';
 
-      if (!accepted.contains(currentUserId)) {
-        accepted.add(currentUserId);
-      }
+        bool found = false;
+        for (var p in participants) {
+          if (p['userId'] == currentUserId) {
+            p['status'] = 'accepted';
+            found = true;
+            break;
+          }
+        }
 
-      tx.update(ref, {
-        'acceptedMembers': accepted,
-        'status': accepted.length == members.length ? 'active' : 'pending',
+        if (!found) {
+          participants.add({
+            'userId': currentUserId,
+            'status': 'accepted',
+          });
+        }
+
+        if (!members.contains(currentUserId)) {
+          members.add(currentUserId);
+        }
+
+        tx.update(ref, {
+          'participants': participants,
+          'members': members,
+        });
+
+        // Notify host
+        if (hostId.isNotEmpty && hostId != currentUserId) {
+          await NotificationService.send(
+            receiverId: hostId,
+            senderId: currentUserId,
+            title: 'Pingtrail accepted',
+            body: '$currentUserName joined your pingtrail',
+            type: 'pingtrail_accepted',
+            pingtrailId: pingtrailId,
+          );
+        }
       });
-    });
 
-    await FirebaseFirestore.instance
-        .collection('notifications')
-        .doc(notificationId)
-        .update({'read': true});
+      await FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(notificationId)
+          .update({'read': true});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Joined pingtrail! Opening map...'),
+            backgroundColor: AppTheme.primaryBlue,
+          ),
+        );
+
+        // Navigate to live map
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ActivePingtrailMapPage(
+              pingtrailId: pingtrailId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error accepting pingtrail: $e');
+    }
   }
 
   Future<void> _declinePingtrailFromNotification(
       String pingtrailId,
       String notificationId,
       ) async {
-    await FirebaseFirestore.instance
-        .collection('pingtrails')
-        .doc(pingtrailId)
-        .update({
-      'members': FieldValue.arrayRemove([currentUserId]),
-      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+    final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
+    
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+      final List<String> members = List<String>.from(data['members'] ?? []);
+
+      members.remove(currentUserId);
+      for (var p in participants) {
+        if (p['userId'] == currentUserId) {
+          p['status'] = 'declined';
+          break;
+        }
+      }
+
+      tx.update(ref, {
+        'members': members,
+        'participants': participants,
+      });
     });
 
     await FirebaseFirestore.instance
@@ -278,7 +348,7 @@ class _NotificationsPageState extends State<NotificationsPage>
                   Tab(
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('Pingtrails'),
+                      child: Text('Trails'),
                     ),
                   ),
                   Tab(
@@ -396,7 +466,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         iconColor = Colors.green;
         break;
 
-      case 'pingtrail_invite':
+      case 'pingtrail_invitation':
         icon = FontAwesomeIcons.route;
         iconColor = AppTheme.primaryBlue;
         break;
@@ -433,8 +503,8 @@ class _NotificationsPageState extends State<NotificationsPage>
         switch (type) {
 
         // Pingtrail invitation
-          case 'pingtrail_invite':
-            if (data['invitationId'] == null) {
+          case 'pingtrail_invitation':
+            if (data['invitationId'] == null || data['invitationId'] == '') {
               _showSnack(context, 'Invitation is no longer available');
               return;
             }
@@ -549,8 +619,8 @@ class _NotificationsPageState extends State<NotificationsPage>
                       ),
 
                       // ACCEPT / DECLINE
-                      if (type == 'friend_request_sent' ||
-                          type == 'pingtrail_invite') ...[
+                      if ((type == 'friend_request_sent' ||
+                          type == 'pingtrail_invitation') && !isRead) ...[
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -584,7 +654,7 @@ class _NotificationsPageState extends State<NotificationsPage>
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () {
-                                  if (type == 'pingtrail_invite') {
+                                  if (type == 'pingtrail_invitation') {
                                     _declinePingtrailFromNotification(
                                       data['pingtrailId'],
                                       doc.id,
@@ -604,6 +674,28 @@ class _NotificationsPageState extends State<NotificationsPage>
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                      if ((type == 'friend_request_sent' || type == 'pingtrail_invitation') && isRead) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                type == 'friend_request_sent' ? 'Accepted' : 'Joined',
+                                style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ],
@@ -671,11 +763,12 @@ class _NotificationsPageState extends State<NotificationsPage>
   Widget _buildPingtrailsTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: _notificationsStream(types: [
-        'pingtrail_invite',
+        'pingtrail_invitation',
         'pingtrail_accepted',
         'pingtrail_declined',
         'pingtrail_cancelled',
         'pingtrail_left',
+        'pingtrail_active',
       ]),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {

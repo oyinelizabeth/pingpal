@@ -7,14 +7,14 @@ import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'pingtrail_complete.dart';
 
-class PingtrailsHistoryPage extends StatefulWidget {
-  const PingtrailsHistoryPage({super.key});
+class Ping_trailsHistoryPage extends StatefulWidget {
+  const Ping_trailsHistoryPage({super.key});
 
   @override
-  State<PingtrailsHistoryPage> createState() => _PingtrailsHistoryPageState();
+  State<Ping_trailsHistoryPage> createState() => _Ping_trailsHistoryPageState();
 }
 
-class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
+class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -48,17 +48,11 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   }
 
   void _openCompletedTrail(QueryDocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PingtrailCompletePage(
-          trailName: data['name'],
-          destination: data['destinationName'],
-          duration: '',
-          distance: '',
-          participants: const [],
+          trailId: doc.id,
         ),
       ),
     );
@@ -133,7 +127,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
           controller: _searchController,
           style: const TextStyle(color: AppTheme.textWhite),
           decoration: const InputDecoration(
-            hintText: 'Search pingtrails',
+            hintText: 'Search ping_trails',
             prefixIcon: Icon(FontAwesomeIcons.magnifyingGlass,
                 size: 16, color: AppTheme.primaryBlue),
             border: InputBorder.none,
@@ -167,22 +161,33 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   Widget _buildCompletedTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .where('members', arrayContains: currentUserId)
-          .where('status', isEqualTo: 'completed')
-          .orderBy('endedAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildQueryError('Error loading history.');
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final docs = snapshot.data!.docs
-            .where((d) => _matchesSearch(d.data() as Map<String, dynamic>))
-            .toList();
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final status = data['status'] ?? 'active';
+          return status == 'completed' && _matchesSearch(data);
+        }).toList();
+
+        // Client-side sort
+        docs.sort((a, b) {
+          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime);
+        });
 
         if (docs.isEmpty) {
-          return _emptyState('No completed pingtrails');
+          return _emptyState('No completed ping_trails');
         }
 
         return ListView(
@@ -191,7 +196,6 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
               .map((doc) => _buildTrailCard(doc, true))
               .toList(),
         );
-
       },
     );
   }
@@ -200,9 +204,13 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   Widget _buildCancelledTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
+          .where('members', arrayContains: currentUserId)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildQueryError('Error loading history.');
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -211,24 +219,31 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
 
         final filteredDocs = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-
           final status = data['status'];
-          final members = List<String>.from(data['members'] ?? []);
-          final leftMembers = List<String>.from(data['leftMembers'] ?? []);
+          final participants = data['participants'] as List<dynamic>? ?? [];
 
-          final bool hostCancelled =
-              status == 'cancelled' &&
-                  (members.contains(currentUserId) ||
-                      leftMembers.contains(currentUserId));
+          final myParticipant = participants.firstWhere(
+            (p) => p['userId'] == currentUserId,
+            orElse: () => null,
+          );
+          final myStatus = myParticipant != null ? myParticipant['status'] : '';
 
-          final bool userLeft = leftMembers.contains(currentUserId);
+          final bool cancelled = status == 'cancelled';
+          final bool userLeft = myStatus == 'left' || myStatus == 'rejected';
 
-          return (hostCancelled || userLeft) &&
-              _matchesSearch(data);
+          return (cancelled || userLeft) && _matchesSearch(data);
         }).toList();
 
+        // Client-side sort
+        filteredDocs.sort((a, b) {
+          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime);
+        });
+
         if (filteredDocs.isEmpty) {
-          return _emptyState('No cancelled pingtrails');
+          return _emptyState('No cancelled ping_trails');
         }
 
         return ListView(
@@ -238,70 +253,102 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
               .toList(),
         );
       },
+    );
+  }
 
+  Widget _buildQueryError(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 40),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Missing Firestore indexes may be the cause.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textGray, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   /// Card
   Widget _buildTrailCard(QueryDocumentSnapshot doc, bool completed) {
     final data = doc.data() as Map<String, dynamic>;
-    final bool userLeft =
-    (data['leftMembers'] ?? []).contains(currentUserId);
+    final participants = data['participants'] as List<dynamic>? ?? [];
+    final myParticipant = participants.firstWhere(
+      (p) => p['userId'] == currentUserId,
+      orElse: () => null,
+    );
+    final bool userLeft = myParticipant != null && (myParticipant['status'] == 'left' || myParticipant['status'] == 'rejected');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            data['name'] ?? 'Pingtrail',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textWhite,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            data['destinationName'] ?? '',
-            style: const TextStyle(color: AppTheme.textGray),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                completed
-                    ? FontAwesomeIcons.circleCheck
-                    : FontAwesomeIcons.circleXmark,
-                size: 14,
-                color: completed
-                    ? Colors.green
-                    : Colors.orange,
+    return GestureDetector(
+      onTap: () => _openCompletedTrail(doc),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.cardBackground,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              data['name'] ?? 'Pingtrail',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textWhite,
               ),
-              const SizedBox(width: 6),
-              Text(
-                completed
-                    ? 'Completed'
-                    : userLeft
-                    ? 'You left this pingtrail'
-                    : 'Cancelled',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              data['destinationName'] ?? '',
+              style: const TextStyle(color: AppTheme.textGray),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  completed
+                      ? FontAwesomeIcons.circleCheck
+                      : FontAwesomeIcons.circleXmark,
+                  size: 14,
                   color: completed
                       ? Colors.green
                       : Colors.orange,
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 6),
+                Text(
+                  completed
+                      ? 'Completed'
+                      : userLeft
+                      ? 'You left this pingtrail'
+                      : 'Cancelled',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: completed
+                        ? Colors.green
+                        : Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,10 +3,12 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'active_pingtrail_map.dart';
 import 'create_pingtrail.dart';
-import 'pingtrails_history.dart';
+import 'pingtrail_complete.dart';
+import 'ping_trails_history.dart';
 import '../widgets/pending_pingtrail_sheet.dart';
 import '../widgets/active_pingtrail_details_sheet.dart';
 import '../widgets/pingtrail_avatar_row.dart';
@@ -38,7 +40,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
   // Accept Pingtrail
   Future<void> acceptPingtrail(String pingtrailId) async {
     final uid = currentUserId;
-    final ref = FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
 
     try {
       await FirebaseFirestore.instance.runTransaction((tx) async {
@@ -49,44 +51,67 @@ class _PingtrailPageState extends State<PingtrailPage> {
         }
 
         final data = snap.data()!;
-        final members = List<String>.from(data['members'] ?? []);
-        final accepted = List<String>.from(data['acceptedMembers'] ?? []);
-        final hostId = data['hostId'] ?? '';
+        final List<dynamic> participants = List.from(data['participants'] ?? []);
+        final List<String> members = List<String>.from(data['members'] ?? []);
+        final String hostId = data['hostId'] ?? '';
 
-        // Add current user to accepted list if not already
-        if (!accepted.contains(uid)) {
-          accepted.add(uid);
+        bool found = false;
+        for (var p in participants) {
+          if (p['userId'] == uid) {
+            p['status'] = 'accepted';
+            found = true;
+            break;
+          }
         }
 
-        // Check if everyone accepted
-        final bool everyoneAccepted = accepted.length == members.length;
+        if (!found) {
+          participants.add({
+            'userId': uid,
+            'status': 'accepted',
+          });
+        }
+
+        if (!members.contains(uid)) {
+          members.add(uid);
+        }
 
         // Update the document
         tx.update(ref, {
-          'acceptedMembers': accepted,
-          'status': everyoneAccepted ? 'active' : 'pending',
-          'startedAt': everyoneAccepted ? FieldValue.serverTimestamp() : null,
+          'participants': participants,
+          'members': members,
         });
 
-        // Optional: trigger notification to host
-        if (!accepted.contains(hostId) && uid != hostId) {
-          final hostSnap = await FirebaseFirestore.instance.collection('users').doc(hostId).get();
-          final hostData = hostSnap.data();
-          final fcmToken = hostData?['fcmToken'];
-
-          if (fcmToken != null) {
-            // Send notification using FCM
-            await FirebaseFirestore.instance.collection('notifications').add({
-              'to': hostId,
-              'fcmToken': fcmToken,
-              'title': 'Pingtrail Accepted ✅',
-              'body': '${data['name'] ?? 'A pingtrail'} has been accepted by a member',
-              'pingtrailId': pingtrailId,
-              'timestamp': FieldValue.serverTimestamp(),
-            });
-          }
+        // Notify host
+        if (hostId.isNotEmpty && hostId != uid) {
+          await NotificationService.send(
+            receiverId: hostId,
+            senderId: uid,
+            title: 'Pingtrail accepted',
+            body: 'A member joined your pingtrail',
+            type: 'pingtrail_accepted',
+            pingtrailId: pingtrailId,
+          );
         }
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Joined pingtrail! Opening map...'),
+            backgroundColor: AppTheme.primaryBlue,
+          ),
+        );
+
+        // Navigate to live map
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ActivePingtrailMapPage(
+              pingtrailId: pingtrailId,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       print("Error accepting pingtrail: $e");
       rethrow;
@@ -95,12 +120,28 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
   // Decline Pingtrail
   Future<void> declinePingtrail(String pingtrailId) async {
-    await FirebaseFirestore.instance
-        .collection('pingtrails')
-        .doc(pingtrailId)
-        .update({
-      'members': FieldValue.arrayRemove([currentUserId]),
-      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+    final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
+    
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+      final List<String> members = List<String>.from(data['members'] ?? []);
+
+      members.remove(currentUserId);
+      for (var p in participants) {
+        if (p['userId'] == currentUserId) {
+          p['status'] = 'declined';
+          break;
+        }
+      }
+
+      tx.update(ref, {
+        'members': members,
+        'participants': participants,
+      });
     });
   }
 
@@ -123,6 +164,19 @@ class _PingtrailPageState extends State<PingtrailPage> {
   }
   // Popup for active pingtrail
   void _openActivePingtrailPopup(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final status = data['status'] ?? 'active';
+
+    if (status == 'completed' || status == 'cancelled') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PingtrailCompletePage(trailId: doc.id),
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -139,6 +193,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       body: SafeArea(
@@ -150,7 +206,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
               children: [
                 const SizedBox(height: 20),
 
-                // Header with profile icon
+                // Header
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -160,13 +216,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.textWhite,
-                      ),
-                    ),
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: AppTheme.cardBackground,
-                      backgroundImage: NetworkImage(
-                        "https://i.pravatar.cc/150?img=8",
                       ),
                     ),
                   ],
@@ -241,7 +290,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       final snap = await FirebaseFirestore.instance
-                          .collection('pingtrails')
+                          .collection('ping_trails')
                           .where('members', arrayContains: currentUserId)
                           .where('status', isEqualTo: 'active')
                           .limit(1)
@@ -258,14 +307,24 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       }
 
                       final doc = snap.docs.first;
-                      final GeoPoint dest = doc['destination'];
+                      final participants = doc['participants'] as List<dynamic>? ?? [];
+                      final myPart = participants.firstWhere((p) => p['userId'] == currentUserId, orElse: () => null);
+                      
+                      if (myPart == null || myPart['status'] != 'accepted') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You must accept the pingtrail before sharing location'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
 
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => ActivePingtrailMapPage(
                             pingtrailId: doc.id,
-                            //destination: dest,
                           ),
                         ),
                       );
@@ -315,21 +374,38 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .where('members', arrayContains: currentUserId)
                       .where('status', isEqualTo: 'active')
-                      .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _buildQueryError('Error loading active trails. Please try again later.');
+                    }
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    final allDocs = snapshot.data?.docs ?? [];
+                    final docs = allDocs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final participants = data['participants'] as List<dynamic>? ?? [];
+                      // Only show if I have accepted and NOT left
+                      return participants.any((p) =>
+                          p['userId'] == currentUserId && p['status'] == 'accepted');
+                    }).toList();
+
+                    // Client-side sort if index is missing for orderBy
+                    docs.sort((a, b) {
+                      final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      if (aTime == null || bTime == null) return 0;
+                      return bTime.compareTo(aTime);
+                    });
+
+                    if (docs.isEmpty) {
                       return _buildNoActivePingtrail();
                     }
-
-                    final docs = snapshot.data!.docs;
 
                     return ListView.separated(
                       shrinkWrap: true,
@@ -347,6 +423,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
                     );
                   },
                 ),
+
+                const SizedBox(height: 32),
 
                 // Pending Pingtrails Section
                 const Text(
@@ -366,11 +444,12 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .where('hostId', isEqualTo: currentUserId)
                       .where('status', isEqualTo: 'pending')
                       .snapshots(),
                   builder: (context, snapshot) {
+                    if (snapshot.hasError) return const SizedBox();
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return const SizedBox();
                     }
@@ -399,7 +478,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                data['name'],
+                                data['name'] ?? 'Pingtrail',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -421,6 +500,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   },
                 ),
 
+                const SizedBox(height: 40),
+
                 // Past Pingtrails Section
                 const Text(
                   'Past Pingtrails',
@@ -436,27 +517,63 @@ class _PingtrailPageState extends State<PingtrailPage> {
                 // Past Pingtrail Cards
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .where('members', arrayContains: currentUserId)
-                      .where('status', isEqualTo: ['completed', 'cancelled'])
-                      .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _buildQueryError('Error loading past trails.');
+                    }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return const Text(
-                        'No past pingtrails',
+                        'No past ping_trails',
+                        style: TextStyle(color: AppTheme.textGray),
+                      );
+                    }
+
+                    final pastTrails = snapshot.data!.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final status = data['status'] ?? 'active';
+                      final participants = data['participants'] as List<dynamic>? ?? [];
+
+                      final myParticipant = participants.firstWhere(
+                        (p) => p['userId'] == currentUserId,
+                        orElse: () => null,
+                      );
+
+                      if (myParticipant == null) return false;
+                      final myStatus = myParticipant['status'] ?? '';
+
+                      // It's a "Past" trail if:
+                      // 1. Trail is completed/cancelled
+                      // 2. OR I have left/rejected it
+                      return status == 'completed' || status == 'cancelled' ||
+                             myStatus == 'left' || myStatus == 'rejected';
+                    }).toList();
+
+                    // Client-side sort
+                    pastTrails.sort((a, b) {
+                      final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      if (aTime == null || bTime == null) return 0;
+                      return bTime.compareTo(aTime);
+                    });
+
+                    final previewTrails = pastTrails.take(3).toList();
+
+                    if (previewTrails.isEmpty) {
+                      return const Text(
+                        'No past ping_trails',
                         style: TextStyle(color: AppTheme.textGray),
                       );
                     }
 
                     return Column(
-                      children: snapshot.data!.docs.map((doc) {
-                        final doc = snapshot.data!.docs.first;
+                      children: previewTrails.map((doc) {
                         return ActivePingtrailCard(
                           doc: doc,
                           onTap: () => _openActivePingtrailPopup(doc),
                         );
-
                       }).toList(),
                     );
                   },
@@ -471,7 +588,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const PingtrailsHistoryPage(),
+                        builder: (_) => const Ping_trailsHistoryPage(),
                       ),
                     );
                   },
@@ -529,7 +646,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
   Widget _buildPendingPingtrails() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .where('members', arrayContains: currentUserId)
           .where('status', isEqualTo: 'pending')
           .snapshots(),
@@ -541,9 +658,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
         final docs = snapshot.data!.docs;
 
         final pendingInvites = docs.where((doc) {
-          final accepted =
-          List<String>.from(doc['acceptedMembers']);
-          return !accepted.contains(currentUserId);
+          final participants = (doc.data() as Map<String, dynamic>)['participants'] as List<dynamic>? ?? [];
+          return participants.any((p) => p['userId'] == currentUserId && p['status'] == 'pending');
         }).toList();
 
         if (pendingInvites.isEmpty) {
@@ -565,12 +681,13 @@ class _PingtrailPageState extends State<PingtrailPage> {
   Widget _buildPendingPingtrailCard(QueryDocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
-    final List<String> members =
-    List<String>.from(data['members'] ?? []);
-    final List<String> accepted =
-    List<String>.from(data['acceptedMembers'] ?? []);
-
-    final bool hasAccepted = accepted.contains(currentUserId);
+    final participants = (data['participants'] as List<dynamic>? ?? []);
+    final members = (data['members'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+    
+    final acceptedCount = participants.where((p) => p['status'] == 'accepted').length;
+    final bool hasAccepted = participants.any((p) => p['userId'] == currentUserId && p['status'] == 'accepted');
     final bool isHost = data['hostId'] == currentUserId;
 
     return GestureDetector(
@@ -620,7 +737,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
             // Accepted count
             Text(
-              '${accepted.length} / ${members.length} pingpals accepted',
+              '$acceptedCount / ${participants.length} pingpals accepted',
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -711,6 +828,35 @@ class _PingtrailPageState extends State<PingtrailPage> {
     );
   }
 
+  Widget _buildQueryError(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 28),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Check Firebase Console for missing indexes if this persists.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textGray, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
 
 }
 
@@ -730,10 +876,11 @@ class ActivePingtrailCard extends StatelessWidget {
 
     final String name = data['name'] ?? 'Pingtrail';
     final String destinationName = data['destinationName'] ?? '';
-    final List<String> members =
-    List<String>.from(data['members'] ?? []);
-    final List<String> accepted =
-    List<String>.from(data['acceptedMembers'] ?? []);
+    final participants = (data['participants'] as List<dynamic>? ?? []);
+    final members = (data['members'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+    final acceptedCount = participants.where((p) => p['status'] == 'accepted').length;
 
     return Material(
       color: Colors.transparent,
@@ -796,7 +943,7 @@ class ActivePingtrailCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '${accepted.length} / ${members.length} pingpals active',
+                    '$acceptedCount / ${participants.length} pingpals active',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -804,6 +951,25 @@ class ActivePingtrailCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Track Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onTap,
+                  icon: const Icon(Icons.map, size: 18),
+                  label: const Text('Track Pingtrail'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

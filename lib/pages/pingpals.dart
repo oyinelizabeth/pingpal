@@ -356,16 +356,14 @@ class _PingpalsPageState extends State<PingpalsPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  StreamBuilder<DocumentSnapshot>(
+                  StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('users')
                         .doc(currentUserId)
+                        .collection('pingpals')
                         .snapshots(),
                     builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const SizedBox();
-
-                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                      final count = (data['friends'] ?? []).length;
+                      final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
 
                       return Text(
                         'MY PINGPALS ($count)',
@@ -398,20 +396,18 @@ class _PingpalsPageState extends State<PingpalsPage> {
 
             // Pingpals List
             Expanded(
-              child: StreamBuilder<DocumentSnapshot>(
+              child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('users')
                     .doc(currentUserId)
+                    .collection('pingpals')
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-                  final List friends = data['friends'] ?? [];
-
-                  if (friends.isEmpty) {
+                  if (snapshot.data!.docs.isEmpty) {
                     return const Center(
                       child: Text(
                         'No Pingpals yet',
@@ -422,22 +418,10 @@ class _PingpalsPageState extends State<PingpalsPage> {
 
                   return ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: friends.length,
+                    itemCount: snapshot.data!.docs.length,
                     itemBuilder: (context, index) {
-                      return StreamBuilder<DocumentSnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(friends[index])
-                            .snapshots(),
-                        builder: (context, userSnap) {
-                          if (!userSnap.hasData) return const SizedBox();
-
-                          final pingpal =
-                          userSnap.data!.data() as Map<String, dynamic>;
-
-                          return _buildPingpalCard(pingpal);
-                        },
-                      );
+                      final pingpal = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+                      return _buildPingpalCard(pingpal);
                     },
                   );
                 },
@@ -456,9 +440,8 @@ class _PingpalsPageState extends State<PingpalsPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => const UserProfilePage(
-              userId: 'user_id',
-              initialStatus: RelationshipStatus.friend,
+            builder: (_) => UserProfilePage(
+              userId: pingpal['uid'],
             ),
           ),
         );
@@ -543,26 +526,6 @@ class _PingpalsPageState extends State<PingpalsPage> {
             // Action Buttons
             Row(
               children: [
-                IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatPage(friendName: pingpal["name"]),
-                      ),
-                    );
-                  },
-                  icon: Icon(
-                    FontAwesomeIcons.message,
-                    color: AppTheme.textGray.withOpacity(0.7),
-                    size: 18,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.inputBackground,
-                    padding: const EdgeInsets.all(10),
-                  ),
-                ),
-                const SizedBox(width: 8),
                 IconButton(
                   onPressed: () {
                     // Show more options

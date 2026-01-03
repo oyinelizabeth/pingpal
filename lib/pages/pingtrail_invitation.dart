@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'active_pingtrail_map.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
@@ -175,7 +176,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
           top: false,
           child: StreamBuilder<DocumentSnapshot>(
             stream: _firestore
-                .collection('pingtrails')
+                .collection('ping_trails')
                 .doc(widget.pingtrailId)
                 .snapshots(),
             builder: (context, trailSnap) {
@@ -191,7 +192,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
 
               return StreamBuilder<DocumentSnapshot>(
                 stream: _firestore
-                    .collection('pingtrails')
+                    .collection('ping_trails')
                     .doc(widget.pingtrailId)
                     .collection('invitations')
                     .doc(widget.invitationId)
@@ -247,10 +248,13 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
         children: [
           CircleAvatar(
             radius: 48,
-            backgroundImage: NetworkImage(
-              invite['fromAvatar'] ??
-                  'https://i.pravatar.cc/150?img=3',
-            ),
+            backgroundColor: AppTheme.inputBackground,
+            backgroundImage: invite['fromAvatar'] != null && invite['fromAvatar'].toString().isNotEmpty
+                ? NetworkImage(invite['fromAvatar'])
+                : null,
+            child: invite['fromAvatar'] == null || invite['fromAvatar'].toString().isEmpty
+                ? const Icon(Icons.person, color: AppTheme.primaryBlue, size: 48)
+                : null,
           ),
           const SizedBox(height: 16),
           RichText(
@@ -321,7 +325,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     if (hostId == null) return;
 
     await _firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(widget.pingtrailId)
         .collection('invitations')
         .doc(widget.invitationId)
@@ -343,15 +347,37 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
   Future<void> _acceptInvite() async {
     if (hostId == null) return;
 
-    await _firestore
-        .collection('pingtrails')
-        .doc(widget.pingtrailId)
-        .update({
-      'members': FieldValue.arrayUnion([currentUserId]),
-    });
+    final docRef = _firestore.collection('ping_trails').doc(widget.pingtrailId);
+    final docSnap = await docRef.get();
+
+    if (docSnap.exists) {
+      final data = docSnap.data()!;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+
+      bool found = false;
+      for (var p in participants) {
+        if (p['userId'] == currentUserId) {
+          p['status'] = 'accepted';
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        participants.add({
+          'userId': currentUserId,
+          'status': 'accepted',
+        });
+      }
+
+      await docRef.update({
+        'participants': participants,
+        'members': FieldValue.arrayUnion([currentUserId]),
+      });
+    }
 
     await _firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(widget.pingtrailId)
         .collection('invitations')
         .doc(widget.invitationId)
@@ -366,7 +392,24 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
       pingtrailId: widget.pingtrailId,
     );
 
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Joined pingtrail! Opening map...'),
+          backgroundColor: AppTheme.primaryBlue,
+        ),
+      );
+
+      // Navigate to live map
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActivePingtrailMapPage(
+            pingtrailId: widget.pingtrailId,
+          ),
+        ),
+      );
+    }
   }
 }
 

@@ -50,18 +50,34 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
   Future<void> _leavePingtrail(BuildContext context) async {
     final pingtrailId = doc.id;
-    final hostId = (data['creatorId'] ?? '').toString();
+    final hostId = (data['hostId'] ?? '').toString();
+    final creatorId = (data['creatorId'] ?? '').toString();
+    final isHost = creatorId == currentUserId || hostId == currentUserId;
+
+    final List<dynamic> participants = List.from(data['participants'] ?? []);
+    for (var p in participants) {
+      if (p['userId'] == currentUserId) {
+        p['status'] = 'left';
+        break;
+      }
+    }
+
+    final Map<String, dynamic> updates = {
+      'participants': participants,
+    };
+
+    // If host leaves, archive the entire trail
+    if (isHost) {
+      updates['status'] = 'completed';
+      updates['endedAt'] = FieldValue.serverTimestamp();
+    }
 
     await FirebaseFirestore.instance
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(pingtrailId)
-        .update({
-      'members': FieldValue.arrayRemove([currentUserId]),
-      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
-      'leftMembers': FieldValue.arrayUnion([currentUserId]),
-    });
+        .update(updates);
 
-    if (hostId.isNotEmpty) {
+    if (hostId.isNotEmpty && !isHost) {
       await NotificationService.send(
         receiverId: hostId,
         senderId: currentUserId,
@@ -142,7 +158,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
     if (confirm == true) {
       await FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .doc(doc.id)
           .update({
         'status': 'cancelled',
@@ -177,13 +193,15 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
         ? (data['arrivalTime'] as Timestamp).toDate()
         : DateTime.now();
 
+    final participants = (data['participants'] as List<dynamic>? ?? []);
     final members = (data['members'] as List<dynamic>? ?? [])
         .whereType<String>()
         .toList();
-
-    final accepted = (data['acceptedMembers'] as List<dynamic>? ?? [])
-        .whereType<String>()
+    final acceptedIds = participants
+        .where((p) => p['status'] == 'accepted')
+        .map((p) => p['userId'].toString())
         .toList();
+    final acceptedCount = acceptedIds.length;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -242,7 +260,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
             const SizedBox(height: 16),
 
             Text(
-              '${accepted.length} / ${members.length} pingpals active',
+              '$acceptedCount / ${participants.length} pingpals active',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -268,7 +286,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
               children: members.map((uid) {
                 return StreamBuilder<DocumentSnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .doc(pingtrailId)
                       .collection('liveLocations')
                       .doc(uid)
@@ -291,7 +309,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
                     return _PingpalTile(
                       uid: uid,
-                      isAccepted: accepted.contains(uid),
+                      isAccepted: acceptedIds.contains(uid),
                       status: status,
                     );
                   },

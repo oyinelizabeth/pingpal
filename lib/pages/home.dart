@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
@@ -10,13 +11,13 @@ import '../widgets/active_pingtrail_details_sheet.dart';
 
 import 'profile.dart';
 import 'friends.dart';
-import 'inbox.dart';
 import 'map.dart';
 import 'notifications.dart';
 import 'requests.dart';
 import 'pingtrail.dart';
 import 'pingpals.dart';
 import 'settings.dart';
+import 'chat_list.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -29,6 +30,7 @@ class _HomePageState extends State<HomePage> {
   int _currentNavIndex = 2;
   GoogleMapController? _mapController;
   final bool _hasNotifications = true;
+  Position? _currentPosition;
 
   final String _currentUserId =
       FirebaseAuth.instance.currentUser!.uid;
@@ -38,17 +40,17 @@ class _HomePageState extends State<HomePage> {
   final List<Map<String, dynamic>> friends = [
     {
       "name": "Emma Wilson",
-      "avatar": "https://i.pravatar.cc/150?img=1",
+      "avatar": null,
       "online": true,
     },
     {
       "name": "Jacob Smith",
-      "avatar": "https://i.pravatar.cc/150?img=2",
+      "avatar": null,
       "online": false,
     },
     {
       "name": "Ava Johnson",
-      "avatar": "https://i.pravatar.cc/150?img=3",
+      "avatar": null,
       "online": true,
     },
   ];
@@ -60,9 +62,38 @@ class _HomePageState extends State<HomePage> {
       const PingtrailPage(),
       const PingpalsPage(),
       const SizedBox.shrink(),
-      const ChatsPage(),
+      const ChatListPage(),
       const SettingsPage(),
     ]);
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    if (permission == LocationPermission.deniedForever) return;
+
+    final position = await Geolocator.getCurrentPosition();
+    if (mounted) {
+      setState(() {
+        _currentPosition = position;
+      });
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(
+          LatLng(position.latitude, position.longitude),
+        ),
+      );
+    }
   }
 
   // -------------------- NAVIGATION --------------------
@@ -81,12 +112,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _centerMapOnUser() {
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        const LatLng(51.5074, -0.1278),
-        14,
-      ),
-    );
+    if (_currentPosition != null) {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+          14,
+        ),
+      );
+    } else {
+      _getCurrentLocation();
+    }
   }
 
   void _toggleMapLayers() {
@@ -94,6 +129,77 @@ class _HomePageState extends State<HomePage> {
       const SnackBar(
         content: Text('Map layers feature coming soon'),
         duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  Widget _buildActiveTrailIndicator(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final name = data['name'] ?? 'Pingtrail';
+    final dest = data['destinationName'] ?? 'Destination';
+
+    return Positioned(
+      top: 130, // Below search bar
+      left: 16,
+      right: 16,
+      child: GestureDetector(
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => ActivePingtrailDetailsSheet(
+              doc: doc as QueryDocumentSnapshot,
+              currentUserId: _currentUserId,
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryBlue,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.route, color: Colors.white, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ACTIVE: $name',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Heading to $dest',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.white),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -121,7 +227,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildActivePingtrailOverview() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .where('status', isEqualTo: 'active')
           .where('members', arrayContains: _currentUserId)
           .snapshots(),
@@ -130,7 +236,16 @@ class _HomePageState extends State<HomePage> {
           return const SizedBox.shrink();
         }
 
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final participants = data['participants'] as List<dynamic>? ?? [];
+          return participants.any((p) =>
+              p['userId'] == _currentUserId && p['status'] == 'accepted');
+        }).toList();
+
+        if (docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
 
         return SizedBox(
           height: 110,
@@ -224,33 +339,79 @@ class _HomePageState extends State<HomePage> {
         // Full-screen Map with ACTIVE PINGTRAILS
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection('pingtrails')
+              .collection('ping_trails')
               .where('status', isEqualTo: 'active')
-              .where('members', arrayContains: _currentUserId)
               .snapshots(),
           builder: (context, snapshot) {
-            final Set<Marker> markers = {
-              const Marker(
-                markerId: MarkerId('user_location'),
-                position: LatLng(51.5074, -0.1278),
-                infoWindow: InfoWindow(title: 'You'),
-              ),
-            };
+            final Set<Marker> markers = {};
+            
+            if (_currentPosition != null) {
+              markers.add(
+                Marker(
+                  markerId: const MarkerId('user_location'),
+                  position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                  infoWindow: const InfoWindow(title: 'You'),
+                ),
+              );
+            } else {
+               markers.add(
+                const Marker(
+                  markerId: MarkerId('user_location'),
+                  position: LatLng(51.5074, -0.1278),
+                  infoWindow: InfoWindow(title: 'You (Default)'),
+                ),
+              );
+            }
+
+            DocumentSnapshot? activeTrailForIndicator;
 
             if (snapshot.hasData) {
+              final now = DateTime.now();
               for (final doc in snapshot.data!.docs) {
                 final data = doc.data() as Map<String, dynamic>;
+                final status = data['status'] ?? 'active';
+                
+                // Automatic termination: 1 hour after expected time
+                final Timestamp? arrivalTimestamp = data['arrivalTime'];
+                if (status == 'active' && arrivalTimestamp != null) {
+                  final arrivalTime = arrivalTimestamp.toDate();
+                  if (now.isAfter(arrivalTime.add(const Duration(hours: 1)))) {
+                    // Update status to 'completed' in Firestore (silently)
+                    FirebaseFirestore.instance.collection('ping_trails').doc(doc.id).update({
+                      'status': 'completed',
+                      'endedAt': FieldValue.serverTimestamp(),
+                    });
+                    continue;
+                  }
+                }
 
-                if (data['destination'] is! GeoPoint) continue;
+                final participants = data['participants'] as List<dynamic>? ?? [];
+                final isParticipant = participants.any((p) => p['userId'] == _currentUserId && p['status'] == 'accepted');
+                
+                if (!isParticipant || status != 'active') continue;
 
-                final GeoPoint dest = data['destination'];
+                // Capture one active trail to show in the UI indicator
+                activeTrailForIndicator ??= doc;
+
+                double lat, lng;
+                final dest = data['destination'];
+                if (dest is GeoPoint) {
+                  lat = dest.latitude;
+                  lng = dest.longitude;
+                } else if (dest is Map) {
+                  lat = (dest['lat'] as num).toDouble();
+                  lng = (dest['lng'] as num).toDouble();
+                } else {
+                  continue;
+                }
+
                 final String title =
                 (data['destinationName'] ?? 'Pingtrail').toString();
 
                 markers.add(
                   Marker(
                     markerId: MarkerId('pingtrail_${doc.id}'),
-                    position: LatLng(dest.latitude, dest.longitude),
+                    position: LatLng(lat, lng),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure,
                     ),
@@ -274,19 +435,27 @@ class _HomePageState extends State<HomePage> {
               }
             }
 
-            return GoogleMap(
-              initialCameraPosition: const CameraPosition(
-                target: LatLng(51.5074, -0.1278),
-                zoom: 14,
-              ),
-              onMapCreated: (controller) {
-                _mapController = controller;
-              },
-              myLocationEnabled: true,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              markers: markers,
+            return Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _currentPosition != null 
+                        ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+                        : const LatLng(51.5074, -0.1278),
+                    zoom: 14,
+                  ),
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                  },
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  mapToolbarEnabled: false,
+                  markers: markers,
+                ),
+                if (activeTrailForIndicator != null)
+                  _buildActiveTrailIndicator(activeTrailForIndicator!),
+              ],
             );
           },
         ),

@@ -16,6 +16,7 @@ class NotificationService {
     required String title,
     required String body,
     String? pingtrailId,
+    String? invitationId,
   }) async {
     await FirebaseFirestore.instance.collection('notifications').add({
       'receiverId': receiverId,
@@ -24,6 +25,7 @@ class NotificationService {
       'title': title,
       'body': body,
       'pingtrailId': pingtrailId ?? '',
+      'invitationId': invitationId ?? '',
       'read': false,
       'createdAt': FieldValue.serverTimestamp(),
     });

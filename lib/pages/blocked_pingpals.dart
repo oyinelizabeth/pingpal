@@ -16,12 +16,12 @@ class _BlockedPingpalsPageState extends State<BlockedPingpalsPage> {
   final List<Map<String, dynamic>> blockedUsers = [
     {
       "username": "@cyber_ninja",
-      "avatar": "https://i.pravatar.cc/150?img=13",
+      "avatar": null,
       "blockedTime": "2 days ago",
     },
     {
       "username": "@map_tracker",
-      "avatar": "https://i.pravatar.cc/150?img=14",
+      "avatar": null,
       "blockedTime": "1 month ago",
     },
     {
@@ -31,7 +31,7 @@ class _BlockedPingpalsPageState extends State<BlockedPingpalsPage> {
     },
     {
       "username": "@travel_bug_x",
-      "avatar": "https://i.pravatar.cc/150?img=15",
+      "avatar": null,
       "blockedTime": "yesterday",
     },
   ];

@@ -12,7 +12,7 @@ class PingtrailInviteService {
   }) async {
     // Create invitation
     final invitationRef = _firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(pingtrailId)
         .collection('invitations')
         .doc();
@@ -30,9 +30,9 @@ class PingtrailInviteService {
       senderId: hostId,
       title: 'Pingtrail invitation',
       body: '$hostName invited you to a Pingtrail',
-      type: 'pingtrail_invite',
+      type: 'pingtrail_invitation',
       pingtrailId: pingtrailId,
-      //invitationId: invitationRef.id,
+      invitationId: invitationRef.id,
     );
   }
 }

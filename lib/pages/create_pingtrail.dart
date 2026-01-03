@@ -34,17 +34,15 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
     return FirebaseFirestore.instance
         .collection('users')
         .doc(currentUserId)
+        .collection('pingpals')
         .snapshots()
         .asyncMap((snapshot) async {
-      final data = snapshot.data() as Map<String, dynamic>;
-      final List friends = data['friends'] ?? [];
-
-      if (friends.isEmpty) return [];
+      if (snapshot.docs.isEmpty) return [];
 
       return Future.wait(
-        friends.map(
-              (id) =>
-              FirebaseFirestore.instance.collection('users').doc(id).get(),
+        snapshot.docs.map(
+              (doc) =>
+              FirebaseFirestore.instance.collection('users').doc(doc.id).get(),
         ),
       );
     });

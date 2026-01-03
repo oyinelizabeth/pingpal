@@ -54,7 +54,7 @@ class LiveLocationService {
       _lastPosition = position;
 
       await FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .doc(pingtrailId)
           .collection('liveLocations')
           .doc(uid)

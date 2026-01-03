@@ -59,7 +59,7 @@ exports.onPingtrailCreated = onDocumentCreated(
         },
         data: {
           pingtrailId: event.params.pingtrailId,
-          type: "pingtrail_invite",
+          type: "pingtrail_invitation",
         },
       });
     },

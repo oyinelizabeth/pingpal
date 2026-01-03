@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:google_places_flutter/model/prediction.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
@@ -153,7 +154,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       return;
     }
 
-    final docRef = await FirebaseFirestore.instance.collection('pingtrails').add({
+    final Map<String, dynamic> pingtrailData = {
       'hostId': user.uid,
       'name': widget.trailName,
       'destinationName': _destinationController.text.trim(),
@@ -162,13 +163,43 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
         _selectedLatLng!.longitude,
       ),
       'arrivalTime': Timestamp.fromDate(arrivalDateTime.toUtc()),
-      'members': [user.uid, ...widget.selectedFriends],
-      'acceptedMembers': [user.uid],
-      'status': 'pending',
+      'participants': [user.uid, ...widget.selectedFriends].map((pId) => {
+        'userId': pId,
+        'status': pId == user.uid ? 'accepted' : 'pending',
+      }).toList(),
+      'members': [user.uid], // Start with just the host
+      'status': 'active',
       'createdAt': FieldValue.serverTimestamp(),
-      'startedAt': null,
+      'startedAt': FieldValue.serverTimestamp(),
       'endedAt': null,
-    });
+    };
+
+    final docRef = await FirebaseFirestore.instance.collection('ping_trails').add(pingtrailData);
+
+    // Send invitations/notifications
+    for (String friendId in widget.selectedFriends) {
+      final inviteRef = await FirebaseFirestore.instance
+          .collection('ping_trails')
+          .doc(docRef.id)
+          .collection('invitations')
+          .add({
+        'fromId': user.uid,
+        'fromName': 'Your friend', // Should ideally fetch sender's name
+        'toId': friendId,
+        'status': 'pending',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      await NotificationService.send(
+        receiverId: friendId,
+        senderId: user.uid,
+        type: 'pingtrail_invitation',
+        title: 'New Pingtrail Invitation',
+        body: 'You have been invited to join ${widget.trailName}',
+        pingtrailId: docRef.id,
+        invitationId: inviteRef.id,
+      );
+    }
     if (!mounted) return; // <<< check here
 
     // Show local notification

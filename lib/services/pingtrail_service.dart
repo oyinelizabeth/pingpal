@@ -7,23 +7,26 @@ class PingtrailService {
 
   /// Create pingtrail
   Future<String> createPingtrail({
+    required String name,
     required String destinationName,
     required GeoPoint destination,
     required DateTime arrivalTime,
-    required List<String> members,
+    required List<String> participants, // members but named participants as per requirements
   }) async {
     final uid = _auth.currentUser!.uid;
 
-    final docRef = await _firestore.collection('pingtrails').add({
-      'creatorId': uid,
+    final docRef = await _firestore.collection('ping_trails').add({
+      'hostId': uid, // creatorId renamed to hostId
+      'name': name,
       'destinationName': destinationName,
       'destination': destination,
       'arrivalTime': Timestamp.fromDate(arrivalTime.toUtc()),
-
-      'members': members,
+      'participants': participants.map((pId) => {
+        'userId': pId,
+        'status': pId == uid ? 'accepted' : 'pending',
+      }).toList(),
       'arrivedMembers': [],
       'status': 'active',
-
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -37,11 +40,36 @@ class PingtrailService {
   }) async {
     final uid = userId ?? _auth.currentUser!.uid;
 
-    await _firestore
-        .collection('pingtrails')
-        .doc(pingtrailId)
-        .update({
-      'arrivedMembers': FieldValue.arrayUnion([uid]),
+    final docRef = _firestore.collection('ping_trails').doc(pingtrailId);
+    
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists) return;
+
+      final data = snapshot.data() as Map<String, dynamic>;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+      
+      bool updated = false;
+      for (var p in participants) {
+        if (p['userId'] == uid) {
+          p['status'] = 'arrived';
+          p['arrivedAt'] = FieldValue.serverTimestamp();
+          updated = true;
+          break;
+        }
+      }
+
+      if (updated) {
+        transaction.update(docRef, {
+          'participants': participants,
+          'arrivedMembers': FieldValue.arrayUnion([uid]),
+        });
+      } else {
+        // If not in participants (shouldn't happen), still add to arrivedMembers
+        transaction.update(docRef, {
+          'arrivedMembers': FieldValue.arrayUnion([uid]),
+        });
+      }
     });
   }
 

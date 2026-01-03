@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -36,13 +37,14 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(
-                      FontAwesomeIcons.arrowLeft,
-                      color: AppTheme.textWhite,
+                  if (Navigator.canPop(context))
+                    IconButton(
+                      icon: const Icon(
+                        FontAwesomeIcons.arrowLeft,
+                        color: AppTheme.textWhite,
+                      ),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
                   const Expanded(
                     child: Center(
                       child: Text(
@@ -55,7 +57,10 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 48), // Balance
+                  if (Navigator.canPop(context))
+                    const SizedBox(width: 48)
+                  else
+                    const SizedBox(width: 16),
                 ],
               ),
             ),
@@ -67,52 +72,90 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 20),
 
                     // Profile Section
-                    Stack(
-                      children: [
-                        const CircleAvatar(
-                          radius: 50,
-                          backgroundImage: NetworkImage(
-                            'https://i.pravatar.cc/300?img=12',
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 2,
-                          right: 2,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppTheme.darkBackground,
-                                width: 2,
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(FirebaseAuth.instance.currentUser?.uid)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData || !snapshot.data!.exists) {
+                          return const Column(
+                            children: [
+                              CircleAvatar(
+                                radius: 50,
+                                backgroundColor: AppTheme.cardBackground,
+                                child: Icon(Icons.person, color: AppTheme.textGray, size: 50),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Loading...',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textWhite,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+
+                        final userData = snapshot.data!.data() as Map<String, dynamic>;
+                        final fullName = userData['fullName'] ?? 'User';
+                        final email = userData['email'] ?? '';
+                        final photoUrl = userData['photoUrl'] ?? '';
+
+                        return Column(
+                          children: [
+                            Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: AppTheme.inputBackground,
+                                  backgroundImage: photoUrl.isNotEmpty
+                                      ? NetworkImage(photoUrl)
+                                      : null,
+                                  child: photoUrl.isEmpty
+                                      ? const Icon(Icons.person, size: 50, color: AppTheme.primaryBlue)
+                                      : null,
+                                ),
+                                Positioned(
+                                  bottom: 2,
+                                  right: 2,
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppTheme.darkBackground,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              fullName,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textWhite,
                               ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    const Text(
-                      'Alex Rider',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textWhite,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      '@alex_rider • Visible to 5 Pals',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.textGray.withOpacity(0.8),
-                      ),
+                            const SizedBox(height: 8),
+                            Text(
+                              email,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: AppTheme.textGray,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 32),

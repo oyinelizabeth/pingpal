@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:pingpal/pages/auth_page.dart';
+import 'package:pingpal/services/local_storage_service.dart';
 
 import '../theme/app_theme.dart';
 
@@ -23,18 +24,13 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     super.dispose();
   }
 
-  /// 🔥 Delete Firestore user data (including subcollections)
+  /// 🔥 Delete Firestore user data (including subcollections and references)
   Future<void> _deleteUserData(String uid) async {
-    final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+    final firestore = FirebaseFirestore.instance;
+    final userRef = firestore.collection('users').doc(uid);
 
-    // 🔹 List all subcollections you use
-    final subCollections = [
-      'friends',
-      'posts',
-      'locations',
-      'chats',
-    ];
-
+    // 1. Delete user subcollections (specifically pingpals)
+    final subCollections = ['pingpals'];
     for (final collection in subCollections) {
       final snapshot = await userRef.collection(collection).get();
       for (final doc in snapshot.docs) {
@@ -42,8 +38,77 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       }
     }
 
-    // 🔹 Delete main user document
+    // 2. Delete friend requests (as sender OR receiver)
+    final sentRequests = await firestore
+        .collection('friend_requests')
+        .where('senderId', isEqualTo: uid)
+        .get();
+    for (final doc in sentRequests.docs) {
+      await doc.reference.delete();
+    }
+
+    final receivedRequests = await firestore
+        .collection('friend_requests')
+        .where('receiverId', isEqualTo: uid)
+        .get();
+    for (final doc in receivedRequests.docs) {
+      await doc.reference.delete();
+    }
+
+    // 3. Delete notifications (as sender OR receiver)
+    final sentNotifs = await firestore
+        .collection('notifications')
+        .where('senderId', isEqualTo: uid)
+        .get();
+    for (final doc in sentNotifs.docs) {
+      await doc.reference.delete();
+    }
+
+    final receivedNotifs = await firestore
+        .collection('notifications')
+        .where('receiverId', isEqualTo: uid)
+        .get();
+    for (final doc in receivedNotifs.docs) {
+      await doc.reference.delete();
+    }
+
+    // 4. Handle Pingtrails
+    // Case A: User is the host -> Delete or Cancel the trail
+    final hostedTrails = await firestore
+        .collection('ping_trails')
+        .where('hostId', isEqualTo: uid)
+        .get();
+    for (final doc in hostedTrails.docs) {
+      // For PoC, we'll mark as cancelled so others can see it ended, 
+      // or just delete it if we want "all records" gone.
+      // Deleting is more aligned with "delete all their records".
+      await doc.reference.delete();
+    }
+
+    // Case B: User is a participant -> Remove from arrays
+    final participatingTrails = await firestore
+        .collection('ping_trails')
+        .where('members', arrayContains: uid)
+        .get();
+    for (final doc in participatingTrails.docs) {
+      final data = doc.data();
+      final members = List<String>.from(data['members'] ?? []);
+      final participants = List<dynamic>.from(data['participants'] ?? []);
+
+      members.remove(uid);
+      participants.removeWhere((p) => p['userId'] == uid);
+
+      await doc.reference.update({
+        'members': members,
+        'participants': participants,
+      });
+    }
+
+    // 5. Delete main user document
     await userRef.delete();
+
+    // 6. Clear Local DB
+    await LocalStorageService.clearAll();
   }
 
   Future<void> _deleteAccount() async {
