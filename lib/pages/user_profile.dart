@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../theme/app_theme.dart';
@@ -26,41 +27,34 @@ class UserProfilePage extends StatefulWidget {
 
 class _UserProfilePageState extends State<UserProfilePage> {
   late RelationshipStatus _relationshipStatus;
-
-  // Sample user data
-  final Map<String, dynamic> userData = {
-    "name": "Sarah Jenkins",
-    "username": "@sarah_j",
-    "avatar": "https://i.pravatar.cc/300?img=3",
-    "lastActive": "5M AGO IN SOHO",
-    "isOnline": true,
-    "stats": {
-      "trails": 12,
-      "pings": 45,
-      "days": 182,
-    },
-    "sharedPingtrails": [
-      {
-        "title": "Roadtrip to Vegas",
-        "date": "Nov 12",
-        "duration": "4h 20m",
-        "speed": "Avg 65mph",
-        "thumbnail": "vegas",
-      },
-      {
-        "title": "Friday Night Out",
-        "date": "Oct 30",
-        "duration": "2h 10m",
-        "participants": "3 pals",
-        "thumbnail": "night",
-      },
-    ],
-  };
+  Map<String, dynamic>? userData;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _relationshipStatus = widget.initialStatus;
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      if (doc.exists && mounted) {
+        setState(() {
+          userData = doc.data();
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
   }
 
   void _sendPingRequest() {
@@ -115,7 +109,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           borderRadius: BorderRadius.circular(20),
         ),
         title: Text(
-          'Remove ${userData["name"].split(' ')[0]}?',
+          'Remove ${uiUserData["name"].split(' ')[0]}?',
           style: const TextStyle(color: AppTheme.textWhite),
         ),
         content: const Text(
@@ -148,8 +142,42 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
+  late Map<String, dynamic> uiUserData;
+
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: AppTheme.darkBackground,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (userData == null) {
+      return const Scaffold(
+        backgroundColor: AppTheme.darkBackground,
+        body: Center(child: Text("User not found", style: TextStyle(color: Colors.white))),
+      );
+    }
+
+    // Adapt userData from Firestore to match the UI's expectations
+    uiUserData = {
+      "name": userData!["fullName"] ?? "Unknown User",
+      "email": userData!["email"] ?? "",
+      "username": userData!["email"] ?? "",
+      "avatar": userData!["photoUrl"] != null && userData!["photoUrl"].isNotEmpty
+          ? userData!["photoUrl"]
+          : "https://i.pravatar.cc/300?img=3",
+      "lastActive": "ONLINE NOW",
+      "isOnline": true,
+      "stats": {
+        "trails": 0,
+        "pings": 0,
+        "days": 0,
+      },
+      "sharedPingtrails": [],
+    };
+
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       body: SafeArea(
@@ -218,10 +246,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           ),
                           child: CircleAvatar(
                             radius: 68,
-                            backgroundImage: NetworkImage(userData["avatar"]),
+                            backgroundImage: NetworkImage(uiUserData["avatar"]),
                           ),
                         ),
-                        if (userData["isOnline"])
+                        if (uiUserData["isOnline"])
                           Positioned(
                             bottom: 8,
                             right: 8,
@@ -245,7 +273,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                     // Name
                     Text(
-                      userData["name"],
+                      uiUserData["name"],
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
@@ -257,7 +285,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                     // Username
                     Text(
-                      userData["username"],
+                      uiUserData["username"],
                       style: TextStyle(
                         fontSize: 16,
                         color: AppTheme.textGray.withOpacity(0.8),
@@ -287,7 +315,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            userData["lastActive"],
+                            uiUserData["lastActive"],
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -356,7 +384,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          ...userData["sharedPingtrails"].map<Widget>(
+                          ...uiUserData["sharedPingtrails"].map<Widget>(
                             (trail) => _buildPingtrailCard(trail),
                           ),
                         ],
@@ -376,7 +404,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             color: Colors.red,
                           ),
                           label: Text(
-                            'Remove ${userData["name"].split(' ')[0]} from Pingpals',
+                            'Remove ${uiUserData["name"].split(' ')[0]} from Pingpals',
                             style: const TextStyle(
                               color: Colors.red,
                               fontWeight: FontWeight.w600,
@@ -449,7 +477,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ChatPage(friendName: userData["name"]),
+                      builder: (_) => ChatPage(friendName: uiUserData["name"]),
                     ),
                   );
                 },
