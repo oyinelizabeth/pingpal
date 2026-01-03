@@ -343,12 +343,34 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
   Future<void> _acceptInvite() async {
     if (hostId == null) return;
 
-    await _firestore
-        .collection('pingtrails')
-        .doc(widget.pingtrailId)
-        .update({
-      'members': FieldValue.arrayUnion([currentUserId]),
-    });
+    final docRef = _firestore.collection('pingtrails').doc(widget.pingtrailId);
+    final docSnap = await docRef.get();
+
+    if (docSnap.exists) {
+      final data = docSnap.data()!;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+
+      bool found = false;
+      for (var p in participants) {
+        if (p['userId'] == currentUserId) {
+          p['status'] = 'accepted';
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        participants.add({
+          'userId': currentUserId,
+          'status': 'accepted',
+        });
+      }
+
+      await docRef.update({
+        'participants': participants,
+        'members': FieldValue.arrayUnion([currentUserId]),
+      });
+    }
 
     await _firestore
         .collection('pingtrails')

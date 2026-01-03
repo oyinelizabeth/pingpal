@@ -22,7 +22,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _storage = FirebaseStorage.instance;
 
   final TextEditingController _displayNameController = TextEditingController();
-  final TextEditingController _pingpalIdController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _statusController = TextEditingController();
 
   bool _ghostModeEnabled = false;
@@ -41,7 +42,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void dispose() {
     _displayNameController.dispose();
-    _pingpalIdController.dispose();
+    _bioController.dispose();
+    _phoneController.dispose();
     _statusController.dispose();
     super.dispose();
   }
@@ -56,7 +58,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (doc.exists) {
       final data = doc.data()!;
       _displayNameController.text = data['fullName'] ?? '';
-      _pingpalIdController.text = data['pingpalId'] ?? '';
+      _bioController.text = data['bio'] ?? '';
+      _phoneController.text = data['phone'] ?? '';
       _statusController.text = data['status'] ?? '';
       _ghostModeEnabled = data['ghostMode'] ?? false;
       _publicVisibilityEnabled = data['publicVisibility'] ?? true;
@@ -109,7 +112,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await _firestore.collection('users').doc(user.uid).set({
         "uid": user.uid,
         "fullName": _displayNameController.text.trim(),
-        "pingpalId": _pingpalIdController.text.trim(),
+        "bio": _bioController.text.trim(),
+        "phone": _phoneController.text.trim(),
         "status": _statusController.text.trim(),
         "photoUrl": imageUrl,
         "ghostMode": _ghostModeEnabled,
@@ -376,9 +380,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                     const SizedBox(height: 24),
 
-                    // Pingpal ID
+                    // Bio
                     const Text(
-                      'Pingpal ID',
+                      'Bio',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -387,28 +391,78 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: _pingpalIdController,
+                      controller: _bioController,
+                      maxLines: 3,
                       style: const TextStyle(
                         color: AppTheme.textWhite,
                         fontSize: 16,
                       ),
                       decoration: InputDecoration(
-                        prefixText: '@ ',
-                        prefixStyle: TextStyle(
-                          color: AppTheme.textGray.withOpacity(0.7),
-                          fontSize: 16,
+                        hintText: 'Tell us about yourself...',
+                        hintStyle: TextStyle(
+                          color: AppTheme.textGray.withOpacity(0.5),
                         ),
                         filled: true,
                         fillColor: AppTheme.cardBackground,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide:
-                          const BorderSide(color: AppTheme.borderColor),
+                              const BorderSide(color: AppTheme.borderColor),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide:
-                          const BorderSide(color: AppTheme.borderColor),
+                              const BorderSide(color: AppTheme.borderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppTheme.primaryBlue,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Phone Number
+                    const Text(
+                      'Phone Number',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textWhite,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      style: const TextStyle(
+                        color: AppTheme.textWhite,
+                        fontSize: 16,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '+1 234 567 890',
+                        hintStyle: TextStyle(
+                          color: AppTheme.textGray.withOpacity(0.5),
+                        ),
+                        filled: true,
+                        fillColor: AppTheme.cardBackground,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppTheme.borderColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppTheme.borderColor),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -424,13 +478,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'This is your unique handle for ping requests.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textGray.withOpacity(0.7),
-                      ),
-                    ),
 
                     const SizedBox(height: 24),
 
@@ -636,78 +683,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
 
                     const SizedBox(height: 24),
-
-                    // Update Phone Number
-                    InkWell(
-                      onTap: () {
-                        // TODO: Navigate to phone number update
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppTheme.cardBackground,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.borderColor),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Update Phone Number',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.textWhite,
-                              ),
-                            ),
-                            Icon(
-                              FontAwesomeIcons.chevronRight,
-                              color: AppTheme.textGray.withOpacity(0.5),
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Linked Accounts
-                    InkWell(
-                      onTap: () {
-                        // TODO: Navigate to linked accounts
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppTheme.cardBackground,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.borderColor),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Linked Accounts',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.textWhite,
-                              ),
-                            ),
-                            Icon(
-                              FontAwesomeIcons.chevronRight,
-                              color: AppTheme.textGray.withOpacity(0.5),
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
                   ],
                 ),
               ),

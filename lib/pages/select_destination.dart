@@ -167,6 +167,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
         'userId': pId,
         'status': pId == user.uid ? 'accepted' : 'pending',
       }).toList(),
+      'members': [user.uid], // Start with just the host
       'status': 'active',
       'createdAt': FieldValue.serverTimestamp(),
       'startedAt': FieldValue.serverTimestamp(),

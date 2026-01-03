@@ -528,26 +528,6 @@ class _PingpalsPageState extends State<PingpalsPage> {
               children: [
                 IconButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatPage(friendName: pingpal["name"]),
-                      ),
-                    );
-                  },
-                  icon: Icon(
-                    FontAwesomeIcons.message,
-                    color: AppTheme.textGray.withOpacity(0.7),
-                    size: 18,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.inputBackground,
-                    padding: const EdgeInsets.all(10),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () {
                     // Show more options
                   },
                   icon: Icon(

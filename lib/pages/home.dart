@@ -10,13 +10,13 @@ import '../widgets/active_pingtrail_details_sheet.dart';
 
 import 'profile.dart';
 import 'friends.dart';
-import 'inbox.dart';
 import 'map.dart';
 import 'notifications.dart';
 import 'requests.dart';
 import 'pingtrail.dart';
 import 'pingpals.dart';
 import 'settings.dart';
+import 'chat_list.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -60,7 +60,7 @@ class _HomePageState extends State<HomePage> {
       const PingtrailPage(),
       const PingpalsPage(),
       const SizedBox.shrink(),
-      const ChatsPage(),
+      const ChatListPage(),
       const SettingsPage(),
     ]);
   }

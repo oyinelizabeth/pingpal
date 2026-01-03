@@ -168,6 +168,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       "avatar": userData!["photoUrl"] != null && userData!["photoUrl"].isNotEmpty
           ? userData!["photoUrl"]
           : "https://i.pravatar.cc/300?img=3",
+      "bio": userData!["bio"] ?? "No bio available.",
       "lastActive": "ONLINE NOW",
       "isOnline": true,
       "stats": {
@@ -289,6 +290,22 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       style: TextStyle(
                         fontSize: 16,
                         color: AppTheme.textGray.withOpacity(0.8),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Bio
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        uiUserData["bio"],
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textGray.withOpacity(0.9),
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ),
 
@@ -466,40 +483,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
                     ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatPage(friendName: uiUserData["name"]),
-                    ),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: const BorderSide(color: AppTheme.borderColor),
-                  backgroundColor: AppTheme.cardBackground,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                icon: const Icon(
-                  FontAwesomeIcons.message,
-                  color: AppTheme.textWhite,
-                  size: 14,
-                ),
-                label: const Text(
-                  'Message',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textWhite,
                   ),
                 ),
               ),
