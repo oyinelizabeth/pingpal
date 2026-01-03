@@ -8,6 +8,7 @@ import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
+// Displays a full-screen invitation flow for joining a Pingtrail
 class PingtrailInvitationPage extends StatefulWidget {
   final String pingtrailId;
   final String invitationId;
@@ -34,12 +35,14 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
   String currentUserName = 'A user';
 
-  /// 👇 MUST be stored on state (used by buttons)
+  // Host ID is cached for notification use
   String? hostId;
 
   @override
   void initState() {
     super.initState();
+
+    // Pulsing animation for dotted path
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -54,6 +57,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     super.dispose();
   }
 
+  // Fetch current user's display name
   Future<void> _loadCurrentUserName() async {
     final snap = await _firestore
         .collection('users')
@@ -92,8 +96,9 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     );
   }
 
-  /* ================= BACKGROUND ================= */
+  // Background
 
+  // Animated grid-style background
   Widget _buildBackground() {
     return Container(
       decoration: const BoxDecoration(
@@ -113,6 +118,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     );
   }
 
+  // Destination marker
   Widget _buildGoalMarker() {
     return const Positioned(
       top: 120,
@@ -137,6 +143,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     );
   }
 
+  // Current user marker
   Widget _buildUserDot() {
     return Positioned(
       bottom: 350,
@@ -159,8 +166,9 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     );
   }
 
-  /* ================= CONTENT ================= */
+  // Content
 
+  // Main invitation card with Firestore listeners
   Widget _buildContentCard() {
     return Positioned(
       bottom: 0,
@@ -187,7 +195,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
               final trail =
               trailSnap.data!.data() as Map<String, dynamic>;
 
-              /// 👇 store hostId on state ONCE
+              // Cache host ID once
               hostId ??= trail['creatorId'];
 
               return StreamBuilder<DocumentSnapshot>(
@@ -217,6 +225,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     );
   }
 
+  // Simple fallback message
   Widget _message(String text) {
     return Padding(
       padding: const EdgeInsets.all(32),
@@ -228,17 +237,13 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     );
   }
 
-  /* ================= INVITE UI ================= */
+  // Invite UI
 
+  // Invitation details and actions
   Widget _buildInvitationContent(
       Map<String, dynamic> trail,
       Map<String, dynamic> invite,
       ) {
-    final Timestamp? ts = trail['startTime'];
-    final int minutesToStart = ts == null
-        ? 0
-        : ts.toDate().difference(DateTime.now()).inMinutes.clamp(0, 999);
-
     final members = (trail['members'] as List?) ?? [];
 
     return Padding(
@@ -249,11 +254,17 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
           CircleAvatar(
             radius: 48,
             backgroundColor: AppTheme.inputBackground,
-            backgroundImage: invite['fromAvatar'] != null && invite['fromAvatar'].toString().isNotEmpty
+            backgroundImage:
+            invite['fromAvatar'] != null &&
+                invite['fromAvatar']
+                    .toString()
+                    .isNotEmpty
                 ? NetworkImage(invite['fromAvatar'])
                 : null,
-            child: invite['fromAvatar'] == null || invite['fromAvatar'].toString().isEmpty
-                ? const Icon(Icons.person, color: AppTheme.primaryBlue, size: 48)
+            child: invite['fromAvatar'] == null ||
+                invite['fromAvatar'].toString().isEmpty
+                ? const Icon(Icons.person,
+                color: AppTheme.primaryBlue, size: 48)
                 : null,
           ),
           const SizedBox(height: 16),
@@ -319,8 +330,9 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     );
   }
 
-  /* ================= ACTIONS ================= */
+  // Actions
 
+  // Declines invitation and notifies host
   Future<void> _declineInvite() async {
     if (hostId == null) return;
 
@@ -344,15 +356,18 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     if (mounted) Navigator.pop(context);
   }
 
+  // Accepts invitation and joins Pingtrail
   Future<void> _acceptInvite() async {
     if (hostId == null) return;
 
-    final docRef = _firestore.collection('ping_trails').doc(widget.pingtrailId);
+    final docRef =
+    _firestore.collection('ping_trails').doc(widget.pingtrailId);
     final docSnap = await docRef.get();
 
     if (docSnap.exists) {
       final data = docSnap.data()!;
-      final List<dynamic> participants = List.from(data['participants'] ?? []);
+      final List<dynamic> participants =
+      List.from(data['participants'] ?? []);
 
       bool found = false;
       for (var p in participants) {
@@ -400,7 +415,6 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
         ),
       );
 
-      // Navigate to live map
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -413,8 +427,8 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
   }
 }
 
-/* ================= PAINTERS ================= */
-
+// Painter
+// Static grid background painter
 class MapGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -438,6 +452,7 @@ class MapGridPainter extends CustomPainter {
   bool shouldRepaint(_) => false;
 }
 
+// Animated dotted path between user and destination
 class DottedPathPainter extends CustomPainter {
   final Animation<double> animation;
 

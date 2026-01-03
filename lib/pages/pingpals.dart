@@ -10,6 +10,7 @@ import 'chats.dart';
 import 'chat_list.dart';
 import 'add_friends.dart';
 
+// Displays the user's Pingpals list and related actions
 class PingpalsPage extends StatefulWidget {
   const PingpalsPage({super.key});
 
@@ -18,12 +19,15 @@ class PingpalsPage extends StatefulWidget {
 }
 
 class _PingpalsPageState extends State<PingpalsPage> {
+  // Current authenticated user ID
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
-  final int _navIndex = 1; // Pingpals is at index 1 (correct)
+
+  // Bottom navigation index for Pingpals tab
+  final int _navIndex = 1;
+
+  /// Search controller for filtering pingpals
   final TextEditingController _searchController = TextEditingController();
   String _sortBy = 'Recent';
-
-
 
   @override
   void dispose() {
@@ -31,6 +35,7 @@ class _PingpalsPageState extends State<PingpalsPage> {
     super.dispose();
   }
 
+  // Opens modal bottom sheet to choose sorting preference
   void _showSortOptions() {
     showModalBottomSheet(
       context: context,
@@ -64,6 +69,7 @@ class _PingpalsPageState extends State<PingpalsPage> {
     );
   }
 
+  // Shows sort options
   Widget _buildSortOption(String option) {
     final isSelected = _sortBy == option;
     return ListTile(
@@ -131,7 +137,6 @@ class _PingpalsPageState extends State<PingpalsPage> {
                       size: 22,
                     ),
                     onPressed: () {
-                      // TODO: Open settings
                     },
                   ),
                 ],
@@ -299,7 +304,6 @@ class _PingpalsPageState extends State<PingpalsPage> {
                                 );
                               },
                             ),
-
                           ],
                         ),
                       ),
@@ -427,13 +431,13 @@ class _PingpalsPageState extends State<PingpalsPage> {
                 },
               ),
             ),
-
           ],
         ),
       ),
     );
   }
 
+  // Individual Pingpal card
   Widget _buildPingpalCard(Map<String, dynamic> pingpal) {
     return GestureDetector(
       onTap: () {
@@ -528,7 +532,6 @@ class _PingpalsPageState extends State<PingpalsPage> {
               children: [
                 IconButton(
                   onPressed: () {
-                    // Show more options
                   },
                   icon: Icon(
                     FontAwesomeIcons.ellipsisVertical,

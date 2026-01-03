@@ -8,6 +8,7 @@ import '../services/notification_service.dart';
 
 enum ArrivalStatus { arrived, enRoute, late }
 
+// Bottom sheet showing live pingtrail details and participant status
 class ActivePingtrailDetailsSheet extends StatelessWidget {
   final QueryDocumentSnapshot doc;
   final String currentUserId;
@@ -21,10 +22,9 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
   Map<String, dynamic> get data =>
       (doc.data() as Map<String, dynamic>? ?? {});
 
-  // ─────────────────────────────
   // Arrival calculation
-  // ─────────────────────────────
 
+  // Determines arrival state based on distance and arrival deadline
   ArrivalStatus _getArrivalStatus({
     required GeoPoint destination,
     required GeoPoint userLocation,
@@ -44,10 +44,9 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     return ArrivalStatus.enRoute;
   }
 
-  // ─────────────────────────────
   // Leave Pingtrail
-  // ─────────────────────────────
 
+  // Marks user as left and updates trail state if host exits
   Future<void> _leavePingtrail(BuildContext context) async {
     final pingtrailId = doc.id;
     final hostId = (data['hostId'] ?? '').toString();
@@ -66,7 +65,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
       'participants': participants,
     };
 
-    // If host leaves, archive the entire trail
+    // Host leaving ends the entire pingtrail
     if (isHost) {
       updates['status'] = 'completed';
       updates['endedAt'] = FieldValue.serverTimestamp();
@@ -77,6 +76,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
         .doc(pingtrailId)
         .update(updates);
 
+    // Notify host when a member leaves
     if (hostId.isNotEmpty && !isHost) {
       await NotificationService.send(
         receiverId: hostId,
@@ -91,6 +91,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     if (context.mounted) Navigator.pop(context);
   }
 
+  // Confirmation dialog before leaving a pingtrail
   Future<void> _confirmLeavePingtrail(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -111,8 +112,10 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Leave',
-                style: TextStyle(color: Colors.orange)),
+            child: const Text(
+              'Leave',
+              style: TextStyle(color: Colors.orange),
+            ),
           ),
         ],
       ),
@@ -123,10 +126,9 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     }
   }
 
-  // ─────────────────────────────
   // Cancel Pingtrail (host)
-  // ─────────────────────────────
 
+  // Confirmation dialog before cancelling the pingtrail
   Future<void> _confirmCancelPingtrail(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -169,18 +171,14 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     }
   }
 
-  // ─────────────────────────────
   // UI
-  // ─────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final pingtrailId = doc.id;
 
     final destinationName =
     (data['destinationName'] ?? 'Unknown destination').toString();
-    final trailName =
-    (data['name'] ?? destinationName).toString();
+    final trailName = (data['name'] ?? destinationName).toString();
 
     final creatorId = (data['creatorId'] ?? '').toString();
     final isHost = creatorId == currentUserId;
@@ -197,10 +195,12 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     final members = (data['members'] as List<dynamic>? ?? [])
         .whereType<String>()
         .toList();
+
     final acceptedIds = participants
         .where((p) => p['status'] == 'accepted')
         .map((p) => p['userId'].toString())
         .toList();
+
     final acceptedCount = acceptedIds.length;
 
     return Padding(
@@ -281,7 +281,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // ───────── PINGPALS LIST ─────────
+            // Live pingpal status list
             Column(
               children: members.map((uid) {
                 return StreamBuilder<DocumentSnapshot>(
@@ -300,8 +300,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
                           raw['location'] is GeoPoint) {
                         status = _getArrivalStatus(
                           destination: destination,
-                          userLocation:
-                          raw['location'] as GeoPoint,
+                          userLocation: raw['location'] as GeoPoint,
                           arrivalTime: arrivalTime,
                         );
                       }
@@ -319,7 +318,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            // Leave / Cancel
+            // Leave or cancel controls
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
@@ -333,24 +332,23 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
                   foregroundColor:
                   isHost ? Colors.red : Colors.orange,
                 ),
-                child: Text(
-                    isHost ? 'Cancel Pingtrail' : 'Leave Pingtrail'),
+                child:
+                Text(isHost ? 'Cancel Pingtrail' : 'Leave Pingtrail'),
               ),
             ),
 
             const SizedBox(height: 12),
 
-            // Track
+            // Navigate to live map view
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        ActivePingtrailMapPage(
-                          pingtrailId: pingtrailId,
-                        ),
+                    builder: (_) => ActivePingtrailMapPage(
+                      pingtrailId: pingtrailId,
+                    ),
                   ),
                 );
               },
@@ -358,8 +356,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
               label: const Text('Track Pingtrail'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryBlue,
-                minimumSize:
-                const Size(double.infinity, 52),
+                minimumSize: const Size(double.infinity, 52),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -372,10 +369,9 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────
 // Pingpal tile
-// ─────────────────────────────
 
+// Displays a single pingpal with live arrival state
 class _PingpalTile extends StatelessWidget {
   final String uid;
   final bool isAccepted;
@@ -407,8 +403,10 @@ class _PingpalTile extends StatelessWidget {
     }
 
     return FutureBuilder<DocumentSnapshot>(
-      future:
-      FirebaseFirestore.instance.collection('users').doc(uid).get(),
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get(),
       builder: (context, snap) {
         final name = snap.data?.data() is Map<String, dynamic>
             ? (snap.data!.data() as Map<String, dynamic>)['fullName']
@@ -420,8 +418,8 @@ class _PingpalTile extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: const CircleAvatar(
             backgroundColor: AppTheme.inputBackground,
-            child: Icon(Icons.person,
-                color: AppTheme.primaryBlue),
+            child:
+            Icon(Icons.person, color: AppTheme.primaryBlue),
           ),
           title: Text(
             name,
@@ -431,17 +429,22 @@ class _PingpalTile extends StatelessWidget {
             ),
           ),
           subtitle: isAccepted
-              ? Text(text,
-              style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w600))
-              : const Text('Pending',
-              style:
-              TextStyle(color: AppTheme.textGray)),
-          trailing: Icon(Icons.circle,
-              size: 12,
-              color:
-              isAccepted ? color : AppTheme.textGray),
+              ? Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          )
+              : const Text(
+            'Pending',
+            style: TextStyle(color: AppTheme.textGray),
+          ),
+          trailing: Icon(
+            Icons.circle,
+            size: 12,
+            color: isAccepted ? color : AppTheme.textGray,
+          ),
         );
       },
     );

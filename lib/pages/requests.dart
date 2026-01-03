@@ -17,7 +17,7 @@ class _RequestsPageState extends State<RequestsPage>
     with SingleTickerProviderStateMixin {
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
   late TabController _tabController;
-  final int _navIndex = 1; // Requests is at index 1
+  final int _navIndex = 1; // Requests tab index in bottom navigation
 
   @override
   void initState() {
@@ -31,7 +31,7 @@ class _RequestsPageState extends State<RequestsPage>
     super.dispose();
   }
 
-
+  // Accepts a friend request and adds both users to each other’s pingpals
   Future<void> acceptRequest(String requestId, String senderId) async {
     final firestore = FirebaseFirestore.instance;
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
@@ -41,6 +41,7 @@ class _RequestsPageState extends State<RequestsPage>
     final receiverRef = firestore.collection('users').doc(currentUserId);
 
     try {
+      // Uses a transaction to ensure both users are updated atomically
       await firestore.runTransaction((transaction) async {
         final senderDoc = await transaction.get(senderRef);
         final receiverDoc = await transaction.get(receiverRef);
@@ -52,7 +53,7 @@ class _RequestsPageState extends State<RequestsPage>
         final senderData = senderDoc.data()!;
         final receiverData = receiverDoc.data()!;
 
-        // Add Sender to Receiver's pingpals sub-collection
+        // Adds sender to receiver’s pingpals
         transaction.set(
           receiverRef.collection('pingpals').doc(senderId),
           {
@@ -64,7 +65,7 @@ class _RequestsPageState extends State<RequestsPage>
           },
         );
 
-        // Add Receiver to Sender's pingpals sub-collection
+        // Adds receiver to sender’s pingpals
         transaction.set(
           senderRef.collection('pingpals').doc(currentUserId),
           {
@@ -76,13 +77,14 @@ class _RequestsPageState extends State<RequestsPage>
           },
         );
 
-        // Delete the request
+        // Removes the processed friend request
         transaction.delete(requestRef);
       });
 
       final receiverDoc = await firestore.collection('users').doc(currentUserId).get();
       final receiverName = receiverDoc['fullName'];
 
+      // Notifies the sender that their request was accepted
       await NotificationService.send(
         receiverId: senderId,
         senderId: currentUserId,
@@ -107,7 +109,7 @@ class _RequestsPageState extends State<RequestsPage>
     }
   }
 
-
+  // Declines a friend request by updating its status
   Future<void> declineRequest(String requestId) async {
     await FirebaseFirestore.instance
         .collection('friend_requests')
@@ -121,7 +123,6 @@ class _RequestsPageState extends State<RequestsPage>
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +171,7 @@ class _RequestsPageState extends State<RequestsPage>
 
             ),
 
-            // Search Bar
+            // Search Bar UI
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Container(
@@ -204,7 +205,7 @@ class _RequestsPageState extends State<RequestsPage>
 
             const SizedBox(height: 20),
 
-            // Tab Bar
+            // Tab for received and sent requests
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
               decoration: BoxDecoration(
@@ -267,7 +268,7 @@ class _RequestsPageState extends State<RequestsPage>
 
             const SizedBox(height: 20),
 
-            // Tab View
+            // Tab content
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -291,6 +292,7 @@ class _RequestsPageState extends State<RequestsPage>
     );
   }
 
+  // Displays incoming friend requests
   Widget _buildReceivedTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -326,13 +328,12 @@ class _RequestsPageState extends State<RequestsPage>
               showActions: true,
             );
           },
-
         );
       },
     );
   }
 
-
+  // Builds a request card with optional accept/decline actions
   Widget _buildRequestCard({
     required QueryDocumentSnapshot request,
     required bool showActions,
@@ -434,57 +435,7 @@ class _RequestsPageState extends State<RequestsPage>
     );
   }
 
-
-  Widget _buildSuggestedCard(Map<String, dynamic> pingpal) {
-    return Column(
-      children: [
-        Stack(
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundImage: NetworkImage(pingpal["avatar"]),
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppTheme.primaryBlue, AppTheme.accentBlue],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryBlue.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  FontAwesomeIcons.plus,
-                  color: Colors.white,
-                  size: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          pingpal["name"],
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textWhite,
-          ),
-        ),
-      ],
-    );
-  }
-
+// Displays outgoing friend requests
   Widget _buildSentTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -525,5 +476,4 @@ class _RequestsPageState extends State<RequestsPage>
       },
     );
   }
-
 }

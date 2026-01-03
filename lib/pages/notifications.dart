@@ -9,7 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/notification_service.dart';
 
-
+// Notification hub for social and Pingtrail events
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
@@ -22,9 +22,11 @@ class _NotificationsPageState extends State<NotificationsPage>
   late TabController _tabController;
   final int _navIndex = 1;
 
+  // Current authenticated user
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
   String currentUserName = 'A user';
 
+  // Converts timestamps into user-friendly date labels
   String _dateLabel(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -38,6 +40,7 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
 
+  // Base Firestore stream for notifications with optional filtering
   Stream<QuerySnapshot> _notificationsStream({List<String>? types}) {
     Query query = FirebaseFirestore.instance
         .collection('notifications')
@@ -45,7 +48,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         .orderBy('createdAt', descending: true);
 
     if (types != null && types.isNotEmpty) {
-      // Ensure 'pingtrail_invitation' is handled correctly in filters
+      // Normalises type names to match Firestore records
       final List<String> filteredTypes = types.map((t) => t == 'pingtrail_invite' ? 'pingtrail_invitation' : t).toList();
       query = query.where('type', whereIn: filteredTypes);
     }
@@ -66,7 +69,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     super.dispose();
   }
 
-
+  // Loads the current user’s name for personalised notifications
   Future<void> _loadCurrentUserName() async {
     final snap = await FirebaseFirestore.instance
         .collection('users')
@@ -80,6 +83,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     }
   }
 
+  // Marks all unread notifications as read
   Future<void> _markAllAsRead() async {
     final batch = FirebaseFirestore.instance.batch();
 
@@ -96,6 +100,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     await batch.commit();
   }
 
+  // Accepts a friend request and updates both user documents
   Future<void> _acceptFriendRequest(String senderId, String notificationId) async {
     final batch = FirebaseFirestore.instance.batch();
 
@@ -118,6 +123,7 @@ class _NotificationsPageState extends State<NotificationsPage>
 
     await batch.commit();
 
+    // Notify sender that their request was accepted
     await NotificationService.send(
       receiverId: senderId,
       senderId: currentUserId,
@@ -128,6 +134,7 @@ class _NotificationsPageState extends State<NotificationsPage>
 
   }
 
+  // Removes a notification when declined
   Future<void> _declineNotification(String notificationId) async {
     await FirebaseFirestore.instance
         .collection('notifications')
@@ -135,6 +142,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         .delete();
   }
 
+  // Accepts a Pingtrail invitation directly from a notification
   Future<void> _acceptPingtrailFromNotification(
       String pingtrailId,
       String notificationId,
@@ -190,6 +198,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         }
       });
 
+      // Mark notification as read
       await FirebaseFirestore.instance
           .collection('notifications')
           .doc(notificationId)
@@ -203,7 +212,7 @@ class _NotificationsPageState extends State<NotificationsPage>
           ),
         );
 
-        // Navigate to live map
+        // Navigate to live tracking map
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -218,6 +227,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     }
   }
 
+  // Declines a Pingtrail invitation from notifications
   Future<void> _declinePingtrailFromNotification(
       String pingtrailId,
       String notificationId,

@@ -43,12 +43,12 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
   void initState() {
     super.initState();
 
-    // Initialize local notifications
+    // Initialises local notifications for Pingtrail creation feedback
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidSettings);
     _localNotifications.initialize(initSettings);
   }
-  // HELPERS
+  // Combines selected date and time into a single DateTime
   DateTime? _getArrivalDateTime() {
     if (_selectedDate == null || _selectedTime == null) return null;
     return DateTime(
@@ -65,6 +65,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
   bool _isCalculatingRoute = false;
   LatLng? _lastRoutedDestination;
 
+  // Calculates distance and ETA using GPS and Google Directions API
   Future<void> _calculateDistanceAndETA(LatLng destination) async {
     if (_lastRoutedDestination == destination) return;
     _lastRoutedDestination = destination;
@@ -125,8 +126,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     );
   }
 
-  // Create Pingtrail
-
+  // Creates a Pingtrail and sends invitations to selected friends
   Future<void> _startPingtrail() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -176,7 +176,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
 
     final docRef = await FirebaseFirestore.instance.collection('ping_trails').add(pingtrailData);
 
-    // Send invitations/notifications
+    // Sends invitations and notifications to selected friends
     for (String friendId in widget.selectedFriends) {
       final inviteRef = await FirebaseFirestore.instance
           .collection('ping_trails')
@@ -184,7 +184,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
           .collection('invitations')
           .add({
         'fromId': user.uid,
-        'fromName': 'Your friend', // Should ideally fetch sender's name
+        'fromName': 'Your friend',
         'toId': friendId,
         'status': 'pending',
         'timestamp': FieldValue.serverTimestamp(),
@@ -200,9 +200,9 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
         invitationId: inviteRef.id,
       );
     }
-    if (!mounted) return; // <<< check here
+    if (!mounted) return;
 
-    // Show local notification
+    // Shows local confirmation notification
     await _localNotifications.show(
       docRef.hashCode,
       'Pingtrail Created!',
@@ -217,7 +217,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       ),
     );
 
-    if (!mounted) return; // <<< check here again
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Pingtrail created! Waiting for pingpals...'),
@@ -232,8 +232,8 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
     _destinationController.dispose();
     super.dispose();
   }
-  // UI
 
+  // UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -241,7 +241,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       body: Stack(
         children: [
 
-          /// Map
+          // Map
           GoogleMap(
             initialCameraPosition: const CameraPosition(
               target: LatLng(51.5074, -0.1278), // London
@@ -252,7 +252,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
             onMapCreated: (controller) => _mapController = controller,
           ),
 
-          /// Back button
+          // Back button
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -269,7 +269,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
             ),
           ),
 
-          /// Bottom sheet
+          // Bottom sheet
           Positioned(
             bottom: 0,
             left: 0,
@@ -285,7 +285,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
 
-                    /// Destination
+                    // Destination
                     const Text(
                       'Destination',
                       style: TextStyle(
@@ -314,7 +314,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                         ),
                       ),
 
-                      /// callback for when lat/lng arrive
+                      // Callback for when lat/lng arrive
                       getPlaceDetailWithLatLng: (Prediction p) {
                         if (p.lat == null || p.lng == null) {
                           debugPrint('Place details loaded but lat/lng missing');
@@ -372,7 +372,6 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                         child: LinearProgressIndicator(minHeight: 2),
                       ),
 
-
                     if (_distanceKm != null && _estimatedTime != null)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -411,7 +410,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
                         ),
                       ),
 
-                    /// Arrival time
+                    // Arrival time
                     const Text(
                       'Arrival time',
                       style: TextStyle(
@@ -469,7 +468,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
 
                     const SizedBox(height: 16),
 
-                    /// Create button
+                    // Create button
                     ElevatedButton(
                       onPressed: _startPingtrail,
                       style: ElevatedButton.styleFrom(

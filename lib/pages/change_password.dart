@@ -31,6 +31,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   @override
   void initState() {
     super.initState();
+    // Listens for password input to validate strength in real time
     _newPasswordController.addListener(_validatePassword);
   }
 
@@ -42,6 +43,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     super.dispose();
   }
 
+  // Validates password strength against requirements
   void _validatePassword() {
     final password = _newPasswordController.text;
     setState(() {
@@ -51,6 +53,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     });
   }
 
+  // Re-authenticates the user and updates their password securely
   Future<void> _savePassword() async {
     if (_currentPasswordController.text.isEmpty) {
       _showError('Please enter your current password');
@@ -76,7 +79,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         return;
       }
 
-      // Re-authenticate
+      // Re-authentication required before sensitive account changes
       final credential = EmailAuthProvider.credential(
         email: user.email!,
         password: _currentPasswordController.text,
@@ -84,7 +87,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
       await user.reauthenticateWithCredential(credential);
 
-      // Update password
+      // Updates the user's password in Firebase Authentication
       await user.updatePassword(_newPasswordController.text);
 
       await FirebaseAuth.instance.signOut();
@@ -105,6 +108,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     }
   }
 
+  // Displays error feedback to the user
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

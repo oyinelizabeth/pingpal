@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'select_destination.dart';
@@ -25,11 +24,12 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
 
   final TextEditingController destinationController = TextEditingController();
 
-// selected pingpals (UIDs)
+// Stores selected Pingpal user IDs (max 5)
   final Set<String> selectedPingpals = {};
 
   bool isCreating = false;
 
+  // Streams the current user's Pingpals with full profile data
   Stream<List<DocumentSnapshot>> friendsStream() {
     return FirebaseFirestore.instance
         .collection('users')
@@ -53,14 +53,12 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
     super.initState();
   }
 
-
   @override
   void dispose() {
     _trailNameController.dispose();
     _searchController.dispose();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +67,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header with close button
+            // Header with close action
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -94,12 +92,12 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 48), // Balance the close button
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
 
-            // Progress Indicator
+            // Step progress indicator
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
@@ -131,7 +129,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
 
             const SizedBox(height: 32),
 
-            // Scrollable Content
+            // Main scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -175,7 +173,6 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                             size: 20,
                           ),
                           onPressed: () {
-                            // Focus on text field
                           },
                         ),
                       ],
@@ -321,7 +318,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
                       ),
                     ),
 
-                    const SizedBox(height: 100), // Space for bottom button
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),
@@ -414,6 +411,7 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
     );
   }
 
+  // Builds a selectable Pingpal card from Firestore user data
   Widget _buildFirestoreFriendCard({
     required String uid,
     required Map<String, dynamic> user,
@@ -490,5 +488,4 @@ class _CreatePingtrailPageState extends State<CreatePingtrailPage> {
       ),
     );
   }
-
 }

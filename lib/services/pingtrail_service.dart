@@ -5,18 +5,18 @@ class PingtrailService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// Create pingtrail
+  // Creates a new Pingtrail document with host, destination, and participants
   Future<String> createPingtrail({
     required String name,
     required String destinationName,
     required GeoPoint destination,
     required DateTime arrivalTime,
-    required List<String> participants, // members but named participants as per requirements
+    required List<String> participants,
   }) async {
     final uid = _auth.currentUser!.uid;
 
     final docRef = await _firestore.collection('ping_trails').add({
-      'hostId': uid, // creatorId renamed to hostId
+      'hostId': uid,
       'name': name,
       'destinationName': destinationName,
       'destination': destination,
@@ -33,7 +33,7 @@ class PingtrailService {
     return docRef.id;
   }
 
-  /// Marks users as arrived
+  // Marks a user as arrived using a Firestore transaction for consistency
   Future<void> markUserArrived({
     required String pingtrailId,
     String? userId,
@@ -41,14 +41,14 @@ class PingtrailService {
     final uid = userId ?? _auth.currentUser!.uid;
 
     final docRef = _firestore.collection('ping_trails').doc(pingtrailId);
-    
+
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(docRef);
       if (!snapshot.exists) return;
 
       final data = snapshot.data() as Map<String, dynamic>;
       final List<dynamic> participants = List.from(data['participants'] ?? []);
-      
+
       bool updated = false;
       for (var p in participants) {
         if (p['userId'] == uid) {
@@ -65,7 +65,7 @@ class PingtrailService {
           'arrivedMembers': FieldValue.arrayUnion([uid]),
         });
       } else {
-        // If not in participants (shouldn't happen), still add to arrivedMembers
+        // Fallback to ensure arrival is still recorded
         transaction.update(docRef, {
           'arrivedMembers': FieldValue.arrayUnion([uid]),
         });
@@ -73,7 +73,7 @@ class PingtrailService {
     });
   }
 
-  /// Send arrival notifications
+  // Sends arrival notifications to all other Pingtrail members
   Future<void> sendArrivalNotifications({
     required String pingtrailId,
     required String userId,
@@ -102,6 +102,7 @@ class PingtrailService {
     await batch.commit();
   }
 
+  // Handles the full arrival flow: update status and notify members
   Future<void> userArrived({
     required String pingtrailId,
     required String userName,

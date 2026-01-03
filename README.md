@@ -1,80 +1,114 @@
 # PingPal
 
-PingPal is a location-sharing Proof of Concept (PoC) application developed to demonstrate **Adaptive Caching in Mobile Cloud Computing**. It allows users ("PingPals") to share real-time locations during specific collaborative sessions called **"Ping Trails."**
+PingPal is a location-sharing Proof of Concept (PoC) mobile application developed to demonstrate Adaptive Caching in Mobile Cloud Computing. It enables users (“Pingpals”) to share live locations during collaborative, time-bounded sessions called **Pingtrails**.
+
+The project focuses on reducing latency and bandwidth usage while maintaining usability under varying network conditions.
+
+---
 
 ## 🚀 Core Innovation: Adaptive Caching
 
-The app's primary research goal is to optimize data transmission based on network conditions. PingPal detects the user's network quality (Wi-Fi, 4G, or 3G) and the backend adjusts the data Time-To-Live (TTL) accordingly:
-- **Short TTL (30s):** For users on high-speed networks (Wi-Fi).
-- **Long TTL (5m):** For users on slower networks (3G), ensuring they remain visible on the map even with infrequent updates.
+PingPal dynamically adapts data update frequency based on a user’s network conditions.
+
+The application detects the client’s connectivity type (Wi-Fi, 4G, or 3G), and the backend adjusts cache Time-To-Live (TTL) values accordingly:
+
+- **Short TTL (~30 seconds):** High-bandwidth networks (Wi-Fi)
+- **Long TTL (~5 minutes):** Low-bandwidth or unstable networks (3G)
+
+This ensures that users on slower networks remain visible on the map even when updates are less frequent, while reducing unnecessary backend load.
 
 ---
 
 ## 🏗️ Hybrid Architecture
 
-PingPal uses a multi-layered "Hybrid" architecture to balance persistence and performance:
+PingPal follows a hybrid cloud architecture to balance data persistence, scalability, and real-time performance.
 
-- **Control Plane (Firebase Firestore):** Manages persistent and slow-moving data:
-  - User Profiles & Bios
-  - Friend Lists (PingPals)
-  - Friend Requests
-  - Session Management (Ping Trail metadata)
-  - Archived Chat History
-- **Data Plane (Node.js/Express + Redis):** Dedicated to high-frequency, real-time data:
-  - Live GPS Coordinates
-  - Active Chat Messages
-  - Adaptive TTL Logic
+### Control Plane – Firebase Firestore
+Handles persistent and low-frequency data:
+- User profiles and account metadata
+- Pingpal (friend) relationships
+- Friend requests and notifications
+- Pingtrail session metadata
+- Archived chat history
+
+### Data Plane – Node.js + Redis
+Optimised for high-frequency, real-time data:
+- Live GPS location updates
+- Active Pingtrail chat messages
+- Adaptive TTL and caching logic
+
+This separation prevents real-time data from overwhelming Firestore while ensuring durability for critical records.
 
 ---
 
 ## ✨ Key Features
 
-### 📍 Ping Trails (Location Sessions)
-- **Session-Based Sharing:** Location sharing is only active during a "Ping Trail."
-- **Host & Participants:** A host selects a destination and invites friends. Once accepted, participants' locations are visible to the group.
-- **Auto-Arrival Detection:** The app calculates the distance to the destination and automatically notifies the group when a member arrives (within 50 meters).
-- **Auto-Termination:** Trails are automatically marked as completed one hour after the expected arrival time.
+### 📍 Pingtrails (Session-Based Location Sharing)
+- Location sharing is only active during a Pingtrail session
+- A host creates a trail, selects a destination, and invites Pingpals
+- Participants must explicitly accept before joining
+- Arrival is automatically detected within a 50-metre radius
+- Trails are marked as completed once the session ends
 
-### 🗺️ Live Map Screen
-- **Real-time Tracking:** See yourself and your friends on a live map.
-- **Adaptive Polling:** The map updates its markers based on the backend's adaptive logic.
-- **Auto-Zoom:** The map automatically adjusts the camera to keep all active participants in view.
-- **Distance Tracking:** Tap any marker to see the participant's profile and their exact distance from you.
+---
 
-### 💬 Active Chat
-- **Session-Centric:** Chat is strictly tied to a Ping Trail session.
-- **Mobile Cloud Optimization:** Adaptive polling intervals for messages:
-  - **Wi-Fi:** 1-second polling.
-  - **Mobile Data:** 5-second polling (bandwidth conservation).
-- **Archiving:** Once a trail ends, the chat becomes a read-only archive stored in Firestore.
-- **Local Persistence:** Uses SQLite for local caching, ensuring instant UI rendering and offline access to history.
+### 🗺️ Live Map
+- Displays all active participants on a shared map
+- Marker updates respect backend adaptive caching rules
+- Camera auto-adjusts to keep participants in view
+- Distance to destination and participants is visible
+
+---
+
+### 💬 Pingtrail Chat
+- Chat is scoped strictly to a Pingtrail session
+- Adaptive polling:
+    - Wi-Fi: ~1 second
+    - Mobile data: ~5 seconds
+- Chats become read-only once a trail ends
+- Chat history is archived in Firestore
+- SQLite is used for fast local caching and offline access
+
+---
 
 ### 👥 Friend Management
-- **Search & Request:** Find friends by email and send "Ping Requests."
-- **Secure Connections:** Friends are only added after mutual acceptance via a secure Firestore transaction.
+- Users can search for Pingpals by email
+- Friend requests require mutual acceptance
+- Firestore transactions ensure consistency
+
+---
 
 ### 👤 Profile & Privacy
-- **Customization:** Upload profile images, add bios, and manage contact info.
-- **Account Deletion:** A comprehensive "Right to be Forgotten" implementation that wipes all user data from Firestore, Authentication, and Local Storage.
+- Users can manage profile details and images
+- Full “Right to be Forgotten” implementation:
+    - Firestore documents and sub-collections
+    - Firebase Authentication account
+    - Local SQLite storage
 
 ---
 
 ## 🛠️ Technology Stack
 
 - **Frontend:** Flutter (iOS & Android)
-- **Backend:** [Node.js, Express (GKE Deployed)](https://github.com/Idadelveloper/pingpal-backend)
-- **Real-time Data:** Redis
-- **Database/Auth:** Firebase Firestore & Firebase Auth
+- **Backend:** Node.js + Express (Google Cloud deployment)
+- **Real-Time Cache:** Redis
+- **Database & Auth:** Firebase Firestore & Firebase Authentication
 - **Local Storage:** SQLite (sqflite)
-- **Location:** Geolocator & Google Maps Flutter
-- **Network:** Connectivity Plus
+- **Maps & Location:** Google Maps Flutter, Geolocator
+- **Connectivity Detection:** connectivity_plus
+
+Backend repository:  
+https://github.com/Idadelveloper/pingpal-backend
 
 ---
 
 ## 🔒 Permissions Required
 
-To function correctly, PingPal requires the following permissions:
-- **Location:** Fine & Coarse location access for real-time tracking.
-- **Internet:** For backend and Firebase communication.
-- **Network State:** For the Adaptive Caching logic.
-- **Notifications:** For friend requests and arrival updates.
+PingPal requires the following permissions:
+
+- Location (Fine & Coarse) – live tracking during Pingtrails
+- Internet – backend and Firebase communication
+- Network state – adaptive caching logic
+- Notifications – invites, arrivals, and friend requests
+
+---

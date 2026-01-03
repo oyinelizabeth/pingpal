@@ -21,8 +21,11 @@ class PingtrailCompletePage extends StatefulWidget {
 class _PingtrailCompletePageState extends State<PingtrailCompletePage>
     with SingleTickerProviderStateMixin {
   final int _navIndex = 0;
+
+  // Animation for completion icon
   late AnimationController _animationController;
-  
+
+  // Loaded trail document
   Map<String, dynamic>? _trailData;
   List<Map<String, dynamic>> _participantsInfo = [];
   bool _isLoading = true;
@@ -37,6 +40,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
     _loadTrailSummary();
   }
 
+  // Loads trail details and participant arrival data
   Future<void> _loadTrailSummary() async {
     try {
       final trailDoc = await FirebaseFirestore.instance
@@ -74,7 +78,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
         });
       }
 
-      // Sort: Host first, then arrived, then others
+      // Sort host first, then arrived participants
       participantsInfo.sort((a, b) {
         if (a['isHost']) return -1;
         if (b['isHost']) return 1;
@@ -104,9 +108,11 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
     super.dispose();
   }
 
+  // Number of participants who arrived
   int get arrivedCount =>
       _participantsInfo.where((p) => p["arrived"]).length;
 
+  // Calculates total journey duration
   String _calculateDuration() {
     if (_trailData == null) return '0m';
     final start = _trailData!['startedAt'] ?? _trailData!['createdAt'];
@@ -454,6 +460,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
     );
   }
 
+  // UI helpers
   Widget _buildStatCard({required String label, required String value}) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
