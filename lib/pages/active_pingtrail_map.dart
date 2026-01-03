@@ -69,9 +69,11 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
     _loadCurrentUserName();
     _checkIfAlreadyArrived();
-    _startLoops();
+    // Loops will be started from build() once destination is fetched
     _listenToTrailChanges();
   }
+
+  bool _loopsStarted = false;
 
   void _listenToTrailChanges() {
     _trailSubscription = FirebaseFirestore.instance
@@ -103,12 +105,12 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     });
   }
 
-  void _startLoops() {
+  void _startLoops(LatLng destination) {
     // 1. Writer Loop (Every 5 Seconds)
     _writerTimer = Timer.periodic(const Duration(seconds: 5), (_) => _writerLoop());
 
     // 2. Reader Loop (Every 2 Seconds)
-    _readerTimer = Timer.periodic(const Duration(seconds: 2), (_) => _readerLoop());
+    _readerTimer = Timer.periodic(const Duration(seconds: 2), (_) => _readerLoop(destination));
   }
 
   Future<void> _writerLoop() async {
@@ -167,6 +169,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
           if (distance < 50) {
             final List<dynamic> participantsData = data['participants'] ?? [];
             final List<String> memberIds = participantsData
+                .where((p) => p['status'] == 'accepted')
                 .map((p) => p['userId'].toString())
                 .toList();
             _onArrivedPressed(memberIds);
@@ -178,7 +181,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     }
   }
 
-  Future<void> _readerLoop() async {
+  Future<void> _readerLoop(LatLng destination) async {
     try {
       final List<dynamic> locations = await LocationApiService.getTrailLocations(widget.pingtrailId);
 
@@ -235,8 +238,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       // Add self marker (Blue) and then fit camera
       await _addSelfMarker();
       
-      if (_markers.isNotEmpty && mounted) {
-        _fitBounds();
+      if (mounted) {
+        _fitBounds(destination);
       }
     } catch (e) {
       debugPrint('Reader loop error: $e');
@@ -392,23 +395,25 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     );
   }
 
-  void _fitBounds() {
-    if (_mapController == null || _markers.isEmpty) return;
+  void _fitBounds(LatLng destination) {
+    if (_mapController == null) return;
 
-    // We only auto-fit every time if we want strict following. 
-    // Usually, we might want to do it once or when participants change.
-    // However, the requirement is "auto zooms or adjusts ... as the locations change".
-    
     double? minLat, maxLat, minLng, maxLng;
+
+    // Include destination in bounds
+    minLat = destination.latitude;
+    maxLat = destination.latitude;
+    minLng = destination.longitude;
+    maxLng = destination.longitude;
 
     for (final marker in _markers) {
       final lat = marker.position.latitude;
       final lng = marker.position.longitude;
 
-      if (minLat == null || lat < minLat) minLat = lat;
-      if (maxLat == null || lat > maxLat) maxLat = lat;
-      if (minLng == null || lng < minLng) minLng = lng;
-      if (maxLng == null || lng > maxLng) maxLng = lng;
+      if (lat < minLat!) minLat = lat;
+      if (lat > maxLat!) maxLat = lat;
+      if (lng < minLng!) minLng = lng;
+      if (lng > maxLng!) maxLng = lng;
     }
 
     if (minLat != null && maxLat != null && minLng != null && maxLng != null) {
@@ -477,8 +482,9 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         .get();
 
     final arrivedMembers =
-    (snap.data()?['arrivedMembers'] as List<dynamic>? ?? [])
-        .whereType<String>()
+    (snap.data()?['participants'] as List<dynamic>? ?? [])
+        .where((p) => p['status'] == 'arrived')
+        .map((p) => p['userId'].toString())
         .toList();
 
     if (arrivedMembers.contains(currentUserId)) {
@@ -566,28 +572,32 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       ) async {
     if (currentUserId != hostId) return;
 
-    await FirebaseFirestore.instance
-        .collection('pingtrails')
-        .doc(widget.pingtrailId)
-        .update({
-      'status': 'cancelled',
-      'endedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await FirebaseFirestore.instance
+          .collection('pingtrails')
+          .doc(widget.pingtrailId)
+          .update({
+        'status': 'cancelled',
+        'endedAt': FieldValue.serverTimestamp(),
+      });
 
-    for (final uid in members) {
-      if (uid == hostId) continue;
+      for (final uid in members) {
+        if (uid == hostId) continue;
 
-      await NotificationService.send(
-        receiverId: uid,
-        senderId: hostId,
-        title: 'Pingtrail cancelled',
-        body: '$trailName was cancelled by the host',
-        type: 'pingtrail_cancelled',
-        pingtrailId: widget.pingtrailId,
-      );
+        await NotificationService.send(
+          receiverId: uid,
+          senderId: hostId,
+          title: 'Pingtrail cancelled',
+          body: '$trailName was cancelled by the host',
+          type: 'pingtrail_cancelled',
+          pingtrailId: widget.pingtrailId,
+        );
+      }
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      debugPrint('Error cancelling pingtrail: $e');
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   // ─────────────────────────────
@@ -612,8 +622,9 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final trail = trailSnap.data!.data() as Map<String, dynamic>;
-          if (trail['destination'] is! GeoPoint) {
+          final trailData = trailSnap.data!.data() as Map<String, dynamic>;
+          final dest = trailData['destination'];
+          if (dest == null) {
             return const Center(
               child: Text(
                 'Destination not set',
@@ -622,140 +633,98 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
             );
           }
 
-          final GeoPoint destGp = trail['destination'];
-          final LatLng destination =
-          LatLng(destGp.latitude, destGp.longitude);
+          LatLng destination;
+          if (dest is GeoPoint) {
+            destination = LatLng(dest.latitude, dest.longitude);
+          } else if (dest is Map) {
+            destination = LatLng(
+              (dest['lat'] as num).toDouble(),
+              (dest['lng'] as num).toDouble(),
+            );
+          } else {
+            return const Center(
+              child: Text(
+                'Invalid destination format',
+                style: TextStyle(color: Colors.white),
+              ),
+            );
+          }
 
           final List<String> members =
-          (trail['members'] as List<dynamic>? ?? [])
+          (trailData['members'] as List<dynamic>? ?? [])
               .whereType<String>()
               .toList();
 
-          final String hostId = (trail['creatorId'] ?? '').toString();
+          final String hostId = (trailData['hostId'] ?? '').toString();
           final String trailName =
-          (trail['destinationName'] ?? 'Pingtrail').toString();
+          (trailData['destinationName'] ?? 'Pingtrail').toString();
 
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('pingtrails')
-                .doc(widget.pingtrailId)
-                .collection('liveLocations')
-                .snapshots(),
-            builder: (context, snapshot) {
-              _markers.clear();
-              _polylines.clear();
+          // Start loops once destination is known
+          if (!_loopsStarted) {
+            _loopsStarted = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _startLoops(destination);
+            });
+          }
 
-              final Set<LatLng> cameraPoints = {destination};
+          // Ensure destination marker is in _markers
+          _markers.add(
+            Marker(
+              markerId: const MarkerId('destination'),
+              position: destination,
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+              infoWindow: InfoWindow(title: trailName, snippet: 'Destination'),
+            ),
+          );
 
-              _markers.add(
-                Marker(
-                  markerId: const MarkerId('destination'),
-                  position: destination,
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueGreen,
+          return Stack(
+            children: [
+              GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: destination,
+                  zoom: 13,
+                ),
+                markers: _markers,
+                polylines: _polylines,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
+                onMapCreated: (c) => _mapController = c,
+              ),
+
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 20,
+                child: ElevatedButton.icon(
+                  onPressed: _hasArrived || _isArriving
+                      ? null
+                      : () => _onArrivedPressed(members),
+                  icon: const Icon(Icons.flag),
+                  label: Text(
+                    _hasArrived
+                        ? 'Arrival confirmed'
+                        : "I've arrived",
                   ),
                 ),
-              );
+              ),
 
-              if (snapshot.hasData) {
-                for (final doc in snapshot.data!.docs) {
-                  final raw = doc.data() as Map<String, dynamic>;
-                  if (raw['location'] is! GeoPoint) continue;
-
-                  final GeoPoint gp = raw['location'];
-                  final LatLng loc =
-                  LatLng(gp.latitude, gp.longitude);
-                  final String uid = doc.id;
-
-                  cameraPoints.add(loc);
-
-                  _markers.add(
-                    Marker(
-                      markerId: MarkerId(uid),
-                      position: loc,
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                        uid == currentUserId
-                            ? BitmapDescriptor.hueAzure
-                            : BitmapDescriptor.hueRed,
-                      ),
+              if (currentUserId == hostId)
+                Positioned(
+                  top: 20,
+                  right: 20,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.red,
                     ),
-                  );
-
-                  _polylines.add(
-                    Polyline(
-                      polylineId: PolylineId(uid),
-                      points: [loc, destination],
-                      color: uid == currentUserId
-                          ? AppTheme.primaryBlue
-                          : AppTheme.primaryBlue.withOpacity(0.35),
-                      width: uid == currentUserId ? 6 : 4,
-                    ),
-                  );
-                }
-              }
-
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                if (!_hasFittedCamera &&
-                    cameraPoints.length > 1 &&
-                    _mapController != null) {
-                  _hasFittedCamera = true;
-                  await _fitCamera(cameraPoints);
-                } else if (_mapController != null &&
-                    cameraPoints.length == 1) {
-                  await _moveToUserLocation();
-                }
-              });
-
-              return Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: destination,
-                      zoom: 13,
-                    ),
-                    markers: _markers,
-                    polylines: _polylines,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    onMapCreated: (c) => _mapController = c,
-                  ),
-
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
-                    child: ElevatedButton.icon(
-                      onPressed: _hasArrived || _isArriving
-                          ? null
-                          : () => _onArrivedPressed(members),
-                      icon: const Icon(Icons.flag),
-                      label: Text(
-                        _hasArrived
-                            ? 'Arrival confirmed'
-                            : "I've arrived",
-                      ),
+                    onPressed: () => _cancelPingtrail(
+                      hostId,
+                      trailName,
+                      members,
                     ),
                   ),
-
-                  if (currentUserId == hostId)
-                    Positioned(
-                      top: 20,
-                      right: 20,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.close,
-                          color: Colors.red,
-                        ),
-                        onPressed: () => _cancelPingtrail(
-                          hostId,
-                          trailName,
-                          members,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+                ),
+            ],
           );
         },
       ),

@@ -19,10 +19,7 @@ class PingtrailService {
       'hostId': uid, // creatorId renamed to hostId
       'name': name,
       'destinationName': destinationName,
-      'destination': {
-        'lat': destination.latitude,
-        'lng': destination.longitude,
-      },
+      'destination': destination,
       'arrivalTime': Timestamp.fromDate(arrivalTime.toUtc()),
       'participants': participants.map((pId) => {
         'userId': pId,

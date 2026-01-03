@@ -158,10 +158,10 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       'hostId': user.uid,
       'name': widget.trailName,
       'destinationName': _destinationController.text.trim(),
-      'destination': {
-        'lat': _selectedLatLng!.latitude,
-        'lng': _selectedLatLng!.longitude,
-      },
+      'destination': GeoPoint(
+        _selectedLatLng!.latitude,
+        _selectedLatLng!.longitude,
+      ),
       'arrivalTime': Timestamp.fromDate(arrivalDateTime.toUtc()),
       'participants': [user.uid, ...widget.selectedFriends].map((pId) => {
         'userId': pId,
