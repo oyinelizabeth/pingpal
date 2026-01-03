@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../theme/app_theme.dart';
 import '../services/live_location_service.dart';
 import '../services/notification_service.dart';
 import '../services/pingtrail_service.dart';
+import '../services/location_api_service.dart';
 
 class ActivePingtrailMapPage extends StatefulWidget {
   final String pingtrailId;
@@ -37,6 +40,10 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
 
+  Timer? _writerTimer;
+  Timer? _readerTimer;
+  Map<String, Marker> _friendMarkers = {};
+
   // ─────────────────────────────
   // Lifecycle
   // ─────────────────────────────
@@ -57,12 +64,135 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     _loadCurrentUserName();
     _checkIfAlreadyArrived();
 
-    /// 🔑 IMPORTANT: write GPS immediately (fixes US location issue)
-    LiveLocationService.start(pingtrailId: widget.pingtrailId);
+    _startLoops();
+  }
+
+  void _startLoops() {
+    // 1. Writer Loop (Every 5 Seconds)
+    _writerTimer = Timer.periodic(const Duration(seconds: 5), (_) => _writerLoop());
+
+    // 2. Reader Loop (Every 2 Seconds)
+    _readerTimer = Timer.periodic(const Duration(seconds: 2), (_) => _readerLoop());
+  }
+
+  Future<void> _writerLoop() async {
+    try {
+      // Get GPS position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Get Network Status
+      final List<ConnectivityResult> connectivityResult = await Connectivity().checkConnectivity();
+      String networkType = '3g'; // Default
+      if (connectivityResult.contains(ConnectivityResult.wifi)) {
+        networkType = 'wifi';
+      } else if (connectivityResult.contains(ConnectivityResult.mobile)) {
+        // Simple logic for PoC: assume mobile is 4g/3g.
+        // In real app we could use another package for more detail.
+        networkType = '4g';
+      }
+
+      // Action: Call POST /update
+      await LocationApiService.sendLocation(
+        userId: currentUserId,
+        lat: position.latitude,
+        lng: position.longitude,
+        networkType: networkType,
+      );
+
+      // Arrival Detection
+      if (!_hasArrived) {
+        final trailSnap = await FirebaseFirestore.instance
+            .collection('pingtrails')
+            .doc(widget.pingtrailId)
+            .get();
+
+        if (trailSnap.exists) {
+          final data = trailSnap.data()!;
+          final dest = data['destination'];
+          double destLat, destLng;
+          if (dest is GeoPoint) {
+            destLat = dest.latitude;
+            destLng = dest.longitude;
+          } else {
+            destLat = (dest['lat'] as num).toDouble();
+            destLng = (dest['lng'] as num).toDouble();
+          }
+
+          final distance = Geolocator.distanceBetween(
+            position.latitude,
+            position.longitude,
+            destLat,
+            destLng,
+          );
+
+          if (distance < 50) {
+            final List<dynamic> participantsData = data['participants'] ?? [];
+            final List<String> memberIds = participantsData
+                .map((p) => p['userId'].toString())
+                .toList();
+            _onArrivedPressed(memberIds);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Writer loop error: $e');
+    }
+  }
+
+  Future<void> _readerLoop() async {
+    try {
+      final List<dynamic> locations = await LocationApiService.getTrailLocations(widget.pingtrailId);
+
+      setState(() {
+        for (var loc in locations) {
+          final String uid = loc['userId'];
+          if (uid == currentUserId) continue;
+
+          final double lat = (loc['location']['lat'] as num).toDouble();
+          final double lng = (loc['location']['lng'] as num).toDouble();
+
+          final marker = Marker(
+            markerId: MarkerId(uid),
+            position: LatLng(lat, lng),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+            infoWindow: InfoWindow(title: 'Friend ($uid)'),
+          );
+
+          _friendMarkers[uid] = marker;
+        }
+
+        // Repaint all markers
+        _markers.clear();
+        _markers.addAll(_friendMarkers.values);
+
+        // Add self marker (Blue)
+        _addSelfMarker();
+      });
+    } catch (e) {
+      debugPrint('Reader loop error: $e');
+    }
+  }
+
+  Future<void> _addSelfMarker() async {
+    final pos = await Geolocator.getCurrentPosition();
+    setState(() {
+      _markers.add(
+        Marker(
+          markerId: MarkerId(currentUserId),
+          position: LatLng(pos.latitude, pos.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: const InfoWindow(title: 'Me'),
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
+    _writerTimer?.cancel();
+    _readerTimer?.cancel();
     LiveLocationService.stop();
     super.dispose();
   }

@@ -50,15 +50,21 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
   Future<void> _leavePingtrail(BuildContext context) async {
     final pingtrailId = doc.id;
-    final hostId = (data['creatorId'] ?? '').toString();
+    final hostId = (data['hostId'] ?? '').toString();
+
+    final List<dynamic> participants = List.from(data['participants'] ?? []);
+    for (var p in participants) {
+      if (p['userId'] == currentUserId) {
+        p['status'] = 'left';
+        break;
+      }
+    }
 
     await FirebaseFirestore.instance
         .collection('pingtrails')
         .doc(pingtrailId)
         .update({
-      'members': FieldValue.arrayRemove([currentUserId]),
-      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
-      'leftMembers': FieldValue.arrayUnion([currentUserId]),
+      'participants': participants,
     });
 
     if (hostId.isNotEmpty) {

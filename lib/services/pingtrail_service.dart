@@ -7,23 +7,29 @@ class PingtrailService {
 
   /// Create pingtrail
   Future<String> createPingtrail({
+    required String name,
     required String destinationName,
     required GeoPoint destination,
     required DateTime arrivalTime,
-    required List<String> members,
+    required List<String> participants, // members but named participants as per requirements
   }) async {
     final uid = _auth.currentUser!.uid;
 
     final docRef = await _firestore.collection('pingtrails').add({
-      'creatorId': uid,
+      'hostId': uid, // creatorId renamed to hostId
+      'name': name,
       'destinationName': destinationName,
-      'destination': destination,
+      'destination': {
+        'lat': destination.latitude,
+        'lng': destination.longitude,
+      },
       'arrivalTime': Timestamp.fromDate(arrivalTime.toUtc()),
-
-      'members': members,
+      'participants': participants.map((pId) => {
+        'userId': pId,
+        'status': pId == uid ? 'accepted' : 'pending',
+      }).toList(),
       'arrivedMembers': [],
       'status': 'active',
-
       'createdAt': FieldValue.serverTimestamp(),
     });
 

@@ -36,58 +36,75 @@ class _RequestsPageState extends State<RequestsPage>
     final firestore = FirebaseFirestore.instance;
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-    final requestRef =
-    firestore.collection('friend_requests').doc(requestId);
-
+    final requestRef = firestore.collection('friend_requests').doc(requestId);
     final senderRef = firestore.collection('users').doc(senderId);
     final receiverRef = firestore.collection('users').doc(currentUserId);
 
-    final batch = firestore.batch();
+    try {
+      await firestore.runTransaction((transaction) async {
+        final senderDoc = await transaction.get(senderRef);
+        final receiverDoc = await transaction.get(receiverRef);
 
-    // Mark request as accepted
-    batch.update(requestRef, {'status': 'accepted'});
+        if (!senderDoc.exists || !receiverDoc.exists) {
+          throw Exception("User not found");
+        }
 
-    // Create / update friends array safely
-    batch.set(
-      senderRef,
-      {
-        'friends': FieldValue.arrayUnion([currentUserId]),
-      },
-      SetOptions(merge: true),
-    );
+        final senderData = senderDoc.data()!;
+        final receiverData = receiverDoc.data()!;
 
-    batch.set(
-      receiverRef,
-      {
-        'friends': FieldValue.arrayUnion([senderId]),
-      },
-      SetOptions(merge: true),
-    );
+        // Add Sender to Receiver's pingpals sub-collection
+        transaction.set(
+          receiverRef.collection('pingpals').doc(senderId),
+          {
+            'uid': senderId,
+            'fullName': senderData['fullName'],
+            'email': senderData['email'],
+            'photoUrl': senderData['photoUrl'] ?? '',
+            'addedAt': FieldValue.serverTimestamp(),
+          },
+        );
 
-    await batch.commit();
+        // Add Receiver to Sender's pingpals sub-collection
+        transaction.set(
+          senderRef.collection('pingpals').doc(currentUserId),
+          {
+            'uid': currentUserId,
+            'fullName': receiverData['fullName'],
+            'email': receiverData['email'],
+            'photoUrl': receiverData['photoUrl'] ?? '',
+            'addedAt': FieldValue.serverTimestamp(),
+          },
+        );
 
-    final receiverDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUserId)
-        .get();
+        // Delete the request
+        transaction.delete(requestRef);
+      });
 
-    final receiverName = receiverDoc['fullName'];
+      final receiverDoc = await firestore.collection('users').doc(currentUserId).get();
+      final receiverName = receiverDoc['fullName'];
 
-    await NotificationService.send(
-      receiverId: senderId,
-      senderId: currentUserId,
-      type: 'friend_request_accepted',
-      title: 'Ping request accepted',
-      body: '$receiverName accepted your ping request',
-    );
+      await NotificationService.send(
+        receiverId: senderId,
+        senderId: currentUserId,
+        type: 'friend_request_accepted',
+        title: 'Ping request accepted',
+        body: '$receiverName accepted your ping request',
+      );
 
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Pingpal added 🎉'),
-        backgroundColor: AppTheme.primaryBlue,
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pingpal added 🎉'),
+          backgroundColor: AppTheme.primaryBlue,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error accepting request: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
 

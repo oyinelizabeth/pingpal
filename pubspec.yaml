@@ -33,6 +33,7 @@ dependencies:
   google_places_flutter: ^2.0.6
   flutter_polyline_points: ^2.0.0
 
+  connectivity_plus: ^6.0.3
   # REST API
   http: ^1.2.2
 

@@ -226,7 +226,6 @@ class _HomePageState extends State<HomePage> {
           stream: FirebaseFirestore.instance
               .collection('pingtrails')
               .where('status', isEqualTo: 'active')
-              .where('members', arrayContains: _currentUserId)
               .snapshots(),
           builder: (context, snapshot) {
             final Set<Marker> markers = {
@@ -238,19 +237,45 @@ class _HomePageState extends State<HomePage> {
             };
 
             if (snapshot.hasData) {
+              final now = DateTime.now();
               for (final doc in snapshot.data!.docs) {
                 final data = doc.data() as Map<String, dynamic>;
+                
+                // Automatic termination: 1 hour after expected time
+                final Timestamp? arrivalTimestamp = data['arrivalTime'];
+                if (arrivalTimestamp != null) {
+                  final arrivalTime = arrivalTimestamp.toDate();
+                  if (now.isAfter(arrivalTime.add(const Duration(hours: 1)))) {
+                    // Update status to 'completed' in Firestore (silently)
+                    FirebaseFirestore.instance.collection('pingtrails').doc(doc.id).update({'status': 'completed'});
+                    continue;
+                  }
+                }
 
-                if (data['destination'] is! GeoPoint) continue;
+                final participants = data['participants'] as List<dynamic>? ?? [];
+                final isParticipant = participants.any((p) => p['userId'] == _currentUserId && p['status'] == 'accepted');
+                
+                if (!isParticipant) continue;
 
-                final GeoPoint dest = data['destination'];
+                double lat, lng;
+                final dest = data['destination'];
+                if (dest is GeoPoint) {
+                  lat = dest.latitude;
+                  lng = dest.longitude;
+                } else if (dest is Map) {
+                  lat = (dest['lat'] as num).toDouble();
+                  lng = (dest['lng'] as num).toDouble();
+                } else {
+                  continue;
+                }
+
                 final String title =
                 (data['destinationName'] ?? 'Pingtrail').toString();
 
                 markers.add(
                   Marker(
                     markerId: MarkerId('pingtrail_${doc.id}'),
-                    position: LatLng(dest.latitude, dest.longitude),
+                    position: LatLng(lat, lng),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure,
                     ),
