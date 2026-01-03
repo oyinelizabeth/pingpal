@@ -196,6 +196,8 @@ class _ChatPageState extends State<ChatPage> {
           final data = doc.data()!;
           final participants = List.from(data['participants'] ?? []);
           final hostId = (data['hostId'] ?? '').toString();
+          final creatorId = (data['creatorId'] ?? '').toString();
+          final isHost = creatorId == _currentUserId || hostId == _currentUserId;
 
           for (var p in participants) {
             if (p['userId'] == _currentUserId) {
@@ -203,9 +205,19 @@ class _ChatPageState extends State<ChatPage> {
               break;
             }
           }
-          await docRef.update({'participants': participants});
 
-          if (hostId.isNotEmpty) {
+          final Map<String, dynamic> updates = {
+            'participants': participants,
+          };
+
+          if (isHost) {
+            updates['status'] = 'completed';
+            updates['endedAt'] = FieldValue.serverTimestamp();
+          }
+
+          await docRef.update(updates);
+
+          if (hostId.isNotEmpty && !isHost) {
             await NotificationService.send(
               receiverId: hostId,
               senderId: _currentUserId,

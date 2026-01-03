@@ -236,7 +236,16 @@ class _HomePageState extends State<HomePage> {
           return const SizedBox.shrink();
         }
 
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final participants = data['participants'] as List<dynamic>? ?? [];
+          return participants.any((p) =>
+              p['userId'] == _currentUserId && p['status'] == 'accepted');
+        }).toList();
+
+        if (docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
 
         return SizedBox(
           height: 110,

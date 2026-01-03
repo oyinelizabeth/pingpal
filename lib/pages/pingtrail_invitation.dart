@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'active_pingtrail_map.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
@@ -388,7 +389,24 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
       pingtrailId: widget.pingtrailId,
     );
 
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Joined pingtrail! Opening map...'),
+          backgroundColor: AppTheme.primaryBlue,
+        ),
+      );
+
+      // Navigate to live map
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActivePingtrailMapPage(
+            pingtrailId: widget.pingtrailId,
+          ),
+        ),
+      );
+    }
   }
 }
 

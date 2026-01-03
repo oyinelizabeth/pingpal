@@ -93,9 +93,24 @@ class _PingtrailPageState extends State<PingtrailPage> {
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Joined pingtrail!')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Joined pingtrail! Opening map...'),
+            backgroundColor: AppTheme.primaryBlue,
+          ),
+        );
+
+        // Navigate to live map
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ActivePingtrailMapPage(
+              pingtrailId: pingtrailId,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       print("Error accepting pingtrail: $e");
       rethrow;
@@ -350,11 +365,18 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    final allDocs = snapshot.data?.docs ?? [];
+                    final docs = allDocs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final participants = data['participants'] as List<dynamic>? ?? [];
+                      // Only show if I have accepted and NOT left
+                      return participants.any((p) =>
+                          p['userId'] == currentUserId && p['status'] == 'accepted');
+                    }).toList();
+
+                    if (docs.isEmpty) {
                       return _buildNoActivePingtrail();
                     }
-
-                    final docs = snapshot.data!.docs;
 
                     return ListView.separated(
                       shrinkWrap: true,
@@ -463,7 +485,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   stream: FirebaseFirestore.instance
                       .collection('pingtrails')
                       .where('members', arrayContains: currentUserId)
-                      .where('status', isEqualTo: ['completed', 'cancelled'])
                       .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
@@ -474,14 +495,39 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       );
                     }
 
+                    final pastTrails = snapshot.data!.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final status = data['status'] ?? 'active';
+                      final participants = data['participants'] as List<dynamic>? ?? [];
+
+                      final myParticipant = participants.firstWhere(
+                        (p) => p['userId'] == currentUserId,
+                        orElse: () => null,
+                      );
+
+                      if (myParticipant == null) return false;
+                      final myStatus = myParticipant['status'] ?? '';
+
+                      // It's a "Past" trail if:
+                      // 1. Trail is completed/cancelled
+                      // 2. OR I have left/rejected it
+                      return status == 'completed' || status == 'cancelled' ||
+                             myStatus == 'left' || myStatus == 'rejected';
+                    }).take(3).toList(); // Show only last 3 in this preview
+
+                    if (pastTrails.isEmpty) {
+                      return const Text(
+                        'No past pingtrails',
+                        style: TextStyle(color: AppTheme.textGray),
+                      );
+                    }
+
                     return Column(
-                      children: snapshot.data!.docs.map((doc) {
-                        final doc = snapshot.data!.docs.first;
+                      children: pastTrails.map((doc) {
                         return ActivePingtrailCard(
                           doc: doc,
                           onTap: () => _openActivePingtrailPopup(doc),
                         );
-
                       }).toList(),
                     );
                   },
@@ -830,6 +876,25 @@ class ActivePingtrailCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Track Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onTap,
+                  icon: const Icon(Icons.map, size: 18),
+                  label: const Text('Track Pingtrail'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

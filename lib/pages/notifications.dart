@@ -195,9 +195,24 @@ class _NotificationsPageState extends State<NotificationsPage>
           .doc(notificationId)
           .update({'read': true});
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Joined pingtrail!')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Joined pingtrail! Opening map...'),
+            backgroundColor: AppTheme.primaryBlue,
+          ),
+        );
+
+        // Navigate to live map
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ActivePingtrailMapPage(
+              pingtrailId: pingtrailId,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Error accepting pingtrail: $e');
     }
@@ -588,8 +603,8 @@ class _NotificationsPageState extends State<NotificationsPage>
                       ),
 
                       // ACCEPT / DECLINE
-                      if (type == 'friend_request_sent' ||
-                          type == 'pingtrail_invitation') ...[
+                      if ((type == 'friend_request_sent' ||
+                          type == 'pingtrail_invitation') && !isRead) ...[
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -643,6 +658,28 @@ class _NotificationsPageState extends State<NotificationsPage>
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                      if ((type == 'friend_request_sent' || type == 'pingtrail_invitation') && isRead) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                type == 'friend_request_sent' ? 'Accepted' : 'Joined',
+                                style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ],

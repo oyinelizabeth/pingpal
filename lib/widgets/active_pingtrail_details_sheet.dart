@@ -51,6 +51,8 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
   Future<void> _leavePingtrail(BuildContext context) async {
     final pingtrailId = doc.id;
     final hostId = (data['hostId'] ?? '').toString();
+    final creatorId = (data['creatorId'] ?? '').toString();
+    final isHost = creatorId == currentUserId || hostId == currentUserId;
 
     final List<dynamic> participants = List.from(data['participants'] ?? []);
     for (var p in participants) {
@@ -60,14 +62,22 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
       }
     }
 
+    final Map<String, dynamic> updates = {
+      'participants': participants,
+    };
+
+    // If host leaves, archive the entire trail
+    if (isHost) {
+      updates['status'] = 'completed';
+      updates['endedAt'] = FieldValue.serverTimestamp();
+    }
+
     await FirebaseFirestore.instance
         .collection('pingtrails')
         .doc(pingtrailId)
-        .update({
-      'participants': participants,
-    });
+        .update(updates);
 
-    if (hostId.isNotEmpty) {
+    if (hostId.isNotEmpty && !isHost) {
       await NotificationService.send(
         receiverId: hostId,
         senderId: currentUserId,

@@ -69,16 +69,10 @@ class _ChatListPageState extends State<ChatListPage> with SingleTickerProviderSt
   }
 
   Widget _buildTrailList({required bool isActive}) {
-    Query query = FirebaseFirestore.instance.collection('pingtrails');
-    
-    if (isActive) {
-      query = query.where('status', isEqualTo: 'active');
-    } else {
-      query = query.where('status', isEqualTo: 'completed');
-    }
-
+    // We want to fetch all trails the user is part of, then filter in memory
+    // because Firestore whereIn/array-contains-any has limits and we have complex logic.
     return StreamBuilder<QuerySnapshot>(
-      stream: query.snapshots(),
+      stream: FirebaseFirestore.instance.collection('pingtrails').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -87,7 +81,24 @@ class _ChatListPageState extends State<ChatListPage> with SingleTickerProviderSt
         final trails = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final List participants = data['participants'] ?? [];
-          return participants.any((p) => p['userId'] == _currentUserId && (isActive ? p['status'] == 'accepted' : true));
+          final String status = data['status'] ?? 'active';
+
+          final myParticipant = participants.firstWhere(
+            (p) => p['userId'] == _currentUserId,
+            orElse: () => null,
+          );
+
+          if (myParticipant == null) return false;
+
+          final myStatus = myParticipant['status'] ?? '';
+
+          if (isActive) {
+            // Active: Trail status is active AND I haven't left/rejected
+            return status == 'active' && myStatus == 'accepted';
+          } else {
+            // Archived: Trail is completed/cancelled OR I have left/rejected
+            return status == 'completed' || status == 'cancelled' || myStatus == 'left' || myStatus == 'rejected';
+          }
         }).toList();
 
         if (trails.isEmpty) {
@@ -100,6 +111,7 @@ class _ChatListPageState extends State<ChatListPage> with SingleTickerProviderSt
           itemBuilder: (context, index) {
             final doc = trails[index];
             final data = doc.data() as Map<String, dynamic>;
+            // In Archived view, isActive should be false for the ChatPage
             return _buildChatCard(doc.id, data, isActive: isActive);
           },
         );

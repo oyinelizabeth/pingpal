@@ -169,17 +169,17 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
       stream: FirebaseFirestore.instance
           .collection('pingtrails')
           .where('members', arrayContains: currentUserId)
-          .where('status', isEqualTo: 'completed')
-          .orderBy('endedAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final docs = snapshot.data!.docs
-            .where((d) => _matchesSearch(d.data() as Map<String, dynamic>))
-            .toList();
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final status = data['status'] ?? 'active';
+          return status == 'completed' && _matchesSearch(data);
+        }).toList();
 
         if (docs.isEmpty) {
           return _emptyState('No completed pingtrails');
@@ -191,7 +191,6 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
               .map((doc) => _buildTrailCard(doc, true))
               .toList(),
         );
-
       },
     );
   }
@@ -201,6 +200,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('pingtrails')
+          .where('members', arrayContains: currentUserId)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
@@ -211,20 +211,19 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
 
         final filteredDocs = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-
           final status = data['status'];
-          final members = List<String>.from(data['members'] ?? []);
-          final leftMembers = List<String>.from(data['leftMembers'] ?? []);
+          final participants = data['participants'] as List<dynamic>? ?? [];
 
-          final bool hostCancelled =
-              status == 'cancelled' &&
-                  (members.contains(currentUserId) ||
-                      leftMembers.contains(currentUserId));
+          final myParticipant = participants.firstWhere(
+            (p) => p['userId'] == currentUserId,
+            orElse: () => null,
+          );
+          final myStatus = myParticipant != null ? myParticipant['status'] : '';
 
-          final bool userLeft = leftMembers.contains(currentUserId);
+          final bool cancelled = status == 'cancelled';
+          final bool userLeft = myStatus == 'left' || myStatus == 'rejected';
 
-          return (hostCancelled || userLeft) &&
-              _matchesSearch(data);
+          return (cancelled || userLeft) && _matchesSearch(data);
         }).toList();
 
         if (filteredDocs.isEmpty) {
@@ -238,7 +237,6 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
               .toList(),
         );
       },
-
     );
   }
 
