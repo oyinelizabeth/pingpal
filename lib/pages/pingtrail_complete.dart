@@ -65,7 +65,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
         participantsInfo.add({
           'uid': uid,
           'name': userData['fullName'] ?? 'Pingpal',
-          'avatar': userData['photoUrl'] ?? 'https://i.pravatar.cc/150?u=$uid',
+          'avatar': userData['photoUrl'] ?? '',
           'isHost': uid == hostId,
           'arrived': p['status'] == 'arrived',
           'arrivedAt': arrivedAt,
@@ -512,7 +512,13 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
                   ),
                   child: CircleAvatar(
                     radius: isHost ? 27 : 28,
-                    backgroundImage: NetworkImage(participant["avatar"]),
+                    backgroundImage: participant['avatar'] != null && participant['avatar'].isNotEmpty 
+                        ? NetworkImage(participant['avatar']) 
+                        : null,
+                    backgroundColor: AppTheme.inputBackground,
+                    child: participant['avatar'] == null || participant['avatar'].isEmpty
+                        ? Icon(Icons.person, color: AppTheme.primaryBlue, size: isHost ? 27 : 28)
+                        : null,
                   ),
                 ),
                 if (isHost)

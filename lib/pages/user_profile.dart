@@ -167,7 +167,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       "username": userData!["email"] ?? "",
       "avatar": userData!["photoUrl"] != null && userData!["photoUrl"].isNotEmpty
           ? userData!["photoUrl"]
-          : "https://i.pravatar.cc/300?img=3",
+          : "",
       "bio": userData!["bio"] ?? "No bio available.",
       "lastActive": "ONLINE NOW",
       "isOnline": true,
@@ -247,7 +247,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           ),
                           child: CircleAvatar(
                             radius: 68,
-                            backgroundImage: NetworkImage(uiUserData["avatar"]),
+                            backgroundColor: AppTheme.inputBackground,
+                            backgroundImage: uiUserData["avatar"] != null && uiUserData["avatar"].toString().isNotEmpty
+                                ? NetworkImage(uiUserData["avatar"])
+                                : null,
+                            child: uiUserData["avatar"] == null || uiUserData["avatar"].toString().isEmpty
+                                ? const Icon(Icons.person, color: AppTheme.primaryBlue, size: 68)
+                                : null,
                           ),
                         ),
                         if (uiUserData["isOnline"])

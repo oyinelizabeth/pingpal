@@ -41,9 +41,13 @@ class ProfilePage extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 45,
+                  backgroundColor: AppTheme.inputBackground,
                   backgroundImage: photoUrl.isNotEmpty
                       ? NetworkImage(photoUrl)
-                      : const NetworkImage("https://i.pravatar.cc/150?img=5"),
+                      : null,
+                  child: photoUrl.isEmpty
+                      ? const Icon(Icons.person, size: 45, color: AppTheme.primaryBlue)
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 Text(

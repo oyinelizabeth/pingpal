@@ -68,15 +68,17 @@ class MarkerHelper {
     final Paint placeholderPaint = Paint()..color = Colors.grey[400]!;
     canvas.drawCircle(Offset(radius, radius), innerRadius, placeholderPaint);
     
-    // Draw a simple person icon or just a letter
+    // Draw a person icon using a path or icon data
+    const IconData personIcon = Icons.person;
     final TextPainter textPainter = TextPainter(
       textDirection: TextDirection.ltr,
       text: TextSpan(
-        text: 'P',
+        text: String.fromCharCode(personIcon.codePoint),
         style: TextStyle(
-          fontSize: radius,
+          fontSize: radius * 1.2,
+          fontFamily: personIcon.fontFamily,
+          package: personIcon.fontPackage,
           color: Colors.white,
-          fontWeight: FontWeight.bold,
         ),
       ),
     );

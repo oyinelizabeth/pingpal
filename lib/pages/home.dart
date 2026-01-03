@@ -40,17 +40,17 @@ class _HomePageState extends State<HomePage> {
   final List<Map<String, dynamic>> friends = [
     {
       "name": "Emma Wilson",
-      "avatar": "https://i.pravatar.cc/150?img=1",
+      "avatar": null,
       "online": true,
     },
     {
       "name": "Jacob Smith",
-      "avatar": "https://i.pravatar.cc/150?img=2",
+      "avatar": null,
       "online": false,
     },
     {
       "name": "Ava Johnson",
-      "avatar": "https://i.pravatar.cc/150?img=3",
+      "avatar": null,
       "online": true,
     },
   ];

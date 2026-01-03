@@ -110,9 +110,13 @@ class _SettingsPageState extends State<SettingsPage> {
                               children: [
                                 CircleAvatar(
                                   radius: 50,
+                                  backgroundColor: AppTheme.inputBackground,
                                   backgroundImage: photoUrl.isNotEmpty
                                       ? NetworkImage(photoUrl)
-                                      : const NetworkImage('https://i.pravatar.cc/300?img=12'),
+                                      : null,
+                                  child: photoUrl.isEmpty
+                                      ? const Icon(Icons.person, size: 50, color: AppTheme.primaryBlue)
+                                      : null,
                                 ),
                                 Positioned(
                                   bottom: 2,

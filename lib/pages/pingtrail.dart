@@ -204,7 +204,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
               children: [
                 const SizedBox(height: 20),
 
-                // Header with profile icon
+                // Header
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -214,13 +214,6 @@ class _PingtrailPageState extends State<PingtrailPage> {
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.textWhite,
-                      ),
-                    ),
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: AppTheme.cardBackground,
-                      backgroundImage: NetworkImage(
-                        "https://i.pravatar.cc/150?img=8",
                       ),
                     ),
                   ],

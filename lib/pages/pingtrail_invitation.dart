@@ -248,10 +248,13 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
         children: [
           CircleAvatar(
             radius: 48,
-            backgroundImage: NetworkImage(
-              invite['fromAvatar'] ??
-                  'https://i.pravatar.cc/150?img=3',
-            ),
+            backgroundColor: AppTheme.inputBackground,
+            backgroundImage: invite['fromAvatar'] != null && invite['fromAvatar'].toString().isNotEmpty
+                ? NetworkImage(invite['fromAvatar'])
+                : null,
+            child: invite['fromAvatar'] == null || invite['fromAvatar'].toString().isEmpty
+                ? const Icon(Icons.person, color: AppTheme.primaryBlue, size: 48)
+                : null,
           ),
           const SizedBox(height: 16),
           RichText(
