@@ -20,13 +20,20 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = doc.data() as Map<String, dynamic>;
 
-    final members = List<String>.from(data['members'] ?? []);
-    final accepted = List<String>.from(data['acceptedMembers'] ?? []);
+    final participants = (data['participants'] as List<dynamic>? ?? []);
+    final members = (data['members'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+    final acceptedIds = participants
+        .where((p) => p['status'] == 'accepted')
+        .map((p) => p['userId'].toString())
+        .toList();
+
     final trailName = data['name'] ?? 'Pingtrail';
     final destinationName = data['destinationName'] ?? 'Destination';
 
     final isHost = data['hostId'] == currentUserId;
-    final hasAccepted = accepted.contains(currentUserId);
+    final hasAccepted = acceptedIds.contains(currentUserId);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -76,7 +83,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
             const SizedBox(height: 16),
 
             Text(
-              '${accepted.length} / ${members.length} pingpals accepted',
+              '${acceptedIds.length} / ${participants.length} pingpals accepted',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -98,8 +105,8 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
             const SizedBox(height: 12),
 
             PendingPingtrailMembersList(
-              memberIds: members,
-              acceptedIds: accepted,
+              memberIds: participants.map((p) => p['userId'].toString()).toList(),
+              acceptedIds: acceptedIds,
               hostId: data['hostId'],
             ),
 

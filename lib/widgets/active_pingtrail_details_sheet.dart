@@ -183,13 +183,15 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
         ? (data['arrivalTime'] as Timestamp).toDate()
         : DateTime.now();
 
+    final participants = (data['participants'] as List<dynamic>? ?? []);
     final members = (data['members'] as List<dynamic>? ?? [])
         .whereType<String>()
         .toList();
-
-    final accepted = (data['acceptedMembers'] as List<dynamic>? ?? [])
-        .whereType<String>()
+    final acceptedIds = participants
+        .where((p) => p['status'] == 'accepted')
+        .map((p) => p['userId'].toString())
         .toList();
+    final acceptedCount = acceptedIds.length;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -248,7 +250,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
             const SizedBox(height: 16),
 
             Text(
-              '${accepted.length} / ${members.length} pingpals active',
+              '$acceptedCount / ${participants.length} pingpals active',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -297,7 +299,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
                     return _PingpalTile(
                       uid: uid,
-                      isAccepted: accepted.contains(uid),
+                      isAccepted: acceptedIds.contains(uid),
                       status: status,
                     );
                   },

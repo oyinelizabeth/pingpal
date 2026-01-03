@@ -30,9 +30,9 @@ class PingtrailInviteService {
       senderId: hostId,
       title: 'Pingtrail invitation',
       body: '$hostName invited you to a Pingtrail',
-      type: 'pingtrail_invite',
+      type: 'pingtrail_invitation',
       pingtrailId: pingtrailId,
-      //invitationId: invitationRef.id,
+      invitationId: invitationRef.id,
     );
   }
 }

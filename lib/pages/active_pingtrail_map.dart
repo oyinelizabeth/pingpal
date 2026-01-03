@@ -48,6 +48,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   final Map<String, Map<String, dynamic>> _participantData = {};
   Position? _lastSelfPosition;
 
+  StreamSubscription? _trailSubscription;
+
   // ─────────────────────────────
   // Lifecycle
   // ─────────────────────────────
@@ -66,24 +68,25 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     currentUserId = user.uid;
 
     _loadCurrentUserName();
-    _loadParticipantData();
     _checkIfAlreadyArrived();
-
     _startLoops();
+    _listenToTrailChanges();
   }
 
-  Future<void> _loadParticipantData() async {
-    try {
-      final trailSnap = await FirebaseFirestore.instance
-          .collection('pingtrails')
-          .doc(widget.pingtrailId)
-          .get();
-
-      if (trailSnap.exists) {
+  void _listenToTrailChanges() {
+    _trailSubscription = FirebaseFirestore.instance
+        .collection('pingtrails')
+        .doc(widget.pingtrailId)
+        .snapshots()
+        .listen((trailSnap) async {
+      if (trailSnap.exists && mounted) {
         final List<dynamic> participants = trailSnap.data()?['participants'] ?? [];
         for (var p in participants) {
           final String uid = p['userId'];
-          if (uid == currentUserId) continue;
+          final String status = p['status'] ?? '';
+          
+          if (uid == currentUserId || status != 'accepted') continue;
+          if (_participantData.containsKey(uid)) continue;
 
           final userDoc = await FirebaseFirestore.instance
               .collection('users')
@@ -97,9 +100,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
           }
         }
       }
-    } catch (e) {
-      debugPrint('Error loading participant data: $e');
-    }
+    });
   }
 
   void _startLoops() {
@@ -448,6 +449,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   void dispose() {
     _writerTimer?.cancel();
     _readerTimer?.cancel();
+    _trailSubscription?.cancel();
+    _mapController?.dispose();
     LiveLocationService.stop();
     super.dispose();
   }

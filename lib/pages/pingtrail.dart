@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'active_pingtrail_map.dart';
 import 'create_pingtrail.dart';
@@ -49,44 +50,52 @@ class _PingtrailPageState extends State<PingtrailPage> {
         }
 
         final data = snap.data()!;
-        final members = List<String>.from(data['members'] ?? []);
-        final accepted = List<String>.from(data['acceptedMembers'] ?? []);
-        final hostId = data['hostId'] ?? '';
+        final List<dynamic> participants = List.from(data['participants'] ?? []);
+        final List<String> members = List<String>.from(data['members'] ?? []);
+        final String hostId = data['hostId'] ?? '';
 
-        // Add current user to accepted list if not already
-        if (!accepted.contains(uid)) {
-          accepted.add(uid);
+        bool found = false;
+        for (var p in participants) {
+          if (p['userId'] == uid) {
+            p['status'] = 'accepted';
+            found = true;
+            break;
+          }
         }
 
-        // Check if everyone accepted
-        final bool everyoneAccepted = accepted.length == members.length;
+        if (!found) {
+          participants.add({
+            'userId': uid,
+            'status': 'accepted',
+          });
+        }
+
+        if (!members.contains(uid)) {
+          members.add(uid);
+        }
 
         // Update the document
         tx.update(ref, {
-          'acceptedMembers': accepted,
-          'status': everyoneAccepted ? 'active' : 'pending',
-          'startedAt': everyoneAccepted ? FieldValue.serverTimestamp() : null,
+          'participants': participants,
+          'members': members,
         });
 
-        // Optional: trigger notification to host
-        if (!accepted.contains(hostId) && uid != hostId) {
-          final hostSnap = await FirebaseFirestore.instance.collection('users').doc(hostId).get();
-          final hostData = hostSnap.data();
-          final fcmToken = hostData?['fcmToken'];
-
-          if (fcmToken != null) {
-            // Send notification using FCM
-            await FirebaseFirestore.instance.collection('notifications').add({
-              'to': hostId,
-              'fcmToken': fcmToken,
-              'title': 'Pingtrail Accepted ✅',
-              'body': '${data['name'] ?? 'A pingtrail'} has been accepted by a member',
-              'pingtrailId': pingtrailId,
-              'timestamp': FieldValue.serverTimestamp(),
-            });
-          }
+        // Notify host
+        if (hostId.isNotEmpty && hostId != uid) {
+          await NotificationService.send(
+            receiverId: hostId,
+            senderId: uid,
+            title: 'Pingtrail accepted',
+            body: 'A member joined your pingtrail',
+            type: 'pingtrail_accepted',
+            pingtrailId: pingtrailId,
+          );
         }
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Joined pingtrail!')),
+      );
     } catch (e) {
       print("Error accepting pingtrail: $e");
       rethrow;
@@ -95,12 +104,28 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
   // Decline Pingtrail
   Future<void> declinePingtrail(String pingtrailId) async {
-    await FirebaseFirestore.instance
-        .collection('pingtrails')
-        .doc(pingtrailId)
-        .update({
-      'members': FieldValue.arrayRemove([currentUserId]),
-      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+    final ref = FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+      final List<String> members = List<String>.from(data['members'] ?? []);
+
+      members.remove(currentUserId);
+      for (var p in participants) {
+        if (p['userId'] == currentUserId) {
+          p['status'] = 'declined';
+          break;
+        }
+      }
+
+      tx.update(ref, {
+        'members': members,
+        'participants': participants,
+      });
     });
   }
 
@@ -541,9 +566,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
         final docs = snapshot.data!.docs;
 
         final pendingInvites = docs.where((doc) {
-          final accepted =
-          List<String>.from(doc['acceptedMembers']);
-          return !accepted.contains(currentUserId);
+          final participants = (doc.data() as Map<String, dynamic>)['participants'] as List<dynamic>? ?? [];
+          return participants.any((p) => p['userId'] == currentUserId && p['status'] == 'pending');
         }).toList();
 
         if (pendingInvites.isEmpty) {
@@ -565,12 +589,13 @@ class _PingtrailPageState extends State<PingtrailPage> {
   Widget _buildPendingPingtrailCard(QueryDocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
-    final List<String> members =
-    List<String>.from(data['members'] ?? []);
-    final List<String> accepted =
-    List<String>.from(data['acceptedMembers'] ?? []);
-
-    final bool hasAccepted = accepted.contains(currentUserId);
+    final participants = (data['participants'] as List<dynamic>? ?? []);
+    final members = (data['members'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+    
+    final acceptedCount = participants.where((p) => p['status'] == 'accepted').length;
+    final bool hasAccepted = participants.any((p) => p['userId'] == currentUserId && p['status'] == 'accepted');
     final bool isHost = data['hostId'] == currentUserId;
 
     return GestureDetector(
@@ -620,7 +645,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
             // Accepted count
             Text(
-              '${accepted.length} / ${members.length} pingpals accepted',
+              '$acceptedCount / ${participants.length} pingpals accepted',
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -730,10 +755,11 @@ class ActivePingtrailCard extends StatelessWidget {
 
     final String name = data['name'] ?? 'Pingtrail';
     final String destinationName = data['destinationName'] ?? '';
-    final List<String> members =
-    List<String>.from(data['members'] ?? []);
-    final List<String> accepted =
-    List<String>.from(data['acceptedMembers'] ?? []);
+    final participants = (data['participants'] as List<dynamic>? ?? []);
+    final members = (data['members'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+    final acceptedCount = participants.where((p) => p['status'] == 'accepted').length;
 
     return Material(
       color: Colors.transparent,
@@ -796,7 +822,7 @@ class ActivePingtrailCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '${accepted.length} / ${members.length} pingpals active',
+                    '$acceptedCount / ${participants.length} pingpals active',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

@@ -178,7 +178,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
 
     // Send invitations/notifications
     for (String friendId in widget.selectedFriends) {
-      await FirebaseFirestore.instance
+      final inviteRef = await FirebaseFirestore.instance
           .collection('pingtrails')
           .doc(docRef.id)
           .collection('invitations')
@@ -197,6 +197,7 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
         title: 'New Pingtrail Invitation',
         body: 'You have been invited to join ${widget.trailName}',
         pingtrailId: docRef.id,
+        invitationId: inviteRef.id,
       );
     }
     if (!mounted) return; // <<< check here
