@@ -222,12 +222,28 @@ class _NotificationsPageState extends State<NotificationsPage>
       String pingtrailId,
       String notificationId,
       ) async {
-    await FirebaseFirestore.instance
-        .collection('ping_trails')
-        .doc(pingtrailId)
-        .update({
-      'members': FieldValue.arrayRemove([currentUserId]),
-      'acceptedMembers': FieldValue.arrayRemove([currentUserId]),
+    final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
+    
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+      final List<String> members = List<String>.from(data['members'] ?? []);
+
+      members.remove(currentUserId);
+      for (var p in participants) {
+        if (p['userId'] == currentUserId) {
+          p['status'] = 'declined';
+          break;
+        }
+      }
+
+      tx.update(ref, {
+        'members': members,
+        'participants': participants,
+      });
     });
 
     await FirebaseFirestore.instance

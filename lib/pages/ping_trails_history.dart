@@ -165,6 +165,9 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
           .where('members', arrayContains: currentUserId)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildQueryError('Error loading history.');
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -174,6 +177,14 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
           final status = data['status'] ?? 'active';
           return status == 'completed' && _matchesSearch(data);
         }).toList();
+
+        // Client-side sort
+        docs.sort((a, b) {
+          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime);
+        });
 
         if (docs.isEmpty) {
           return _emptyState('No completed ping_trails');
@@ -197,6 +208,9 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
           .where('members', arrayContains: currentUserId)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildQueryError('Error loading history.');
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -220,6 +234,14 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
           return (cancelled || userLeft) && _matchesSearch(data);
         }).toList();
 
+        // Client-side sort
+        filteredDocs.sort((a, b) {
+          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime);
+        });
+
         if (filteredDocs.isEmpty) {
           return _emptyState('No cancelled ping_trails');
         }
@@ -231,6 +253,32 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
               .toList(),
         );
       },
+    );
+  }
+
+  Widget _buildQueryError(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 40),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Missing Firestore indexes may be the cause.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textGray, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -90,8 +90,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         for (var p in participants) {
           final String uid = p['userId'];
           final String status = p['status'] ?? '';
-          
-          if (uid == currentUserId || status != 'accepted') continue;
+
+          if (uid == currentUserId || (status != 'accepted' && status != 'arrived')) continue;
           if (_participantData.containsKey(uid)) continue;
 
           final userDoc = await FirebaseFirestore.instance
@@ -111,10 +111,14 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   void _startLoops(LatLng destination) {
     // 1. Writer Loop (Every 5 Seconds)
-    _writerTimer = Timer.periodic(const Duration(seconds: 5), (_) => _writerLoop());
+    _writerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _writerLoop();
+    });
 
     // 2. Reader Loop (Every 2 Seconds)
-    _readerTimer = Timer.periodic(const Duration(seconds: 2), (_) => _readerLoop(destination));
+    _readerTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) _readerLoop(destination);
+    });
   }
 
   Future<void> _writerLoop() async {
@@ -123,6 +127,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      if (!mounted) return;
       _lastSelfPosition = position;
 
       // Get Network Status
@@ -145,13 +150,13 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       );
 
       // Arrival Detection
-      if (!_hasArrived) {
+      if (!_hasArrived && mounted) {
         final trailSnap = await FirebaseFirestore.instance
             .collection('ping_trails')
             .doc(widget.pingtrailId)
             .get();
 
-        if (trailSnap.exists) {
+        if (trailSnap.exists && mounted) {
           final data = trailSnap.data()!;
           final dest = data['destination'];
           double destLat, destLng;
@@ -170,7 +175,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
             destLng,
           );
 
-          if (distance < 50) {
+          if (distance < 50 && mounted) {
             final List<dynamic> participantsData = data['participants'] ?? [];
             final List<String> memberIds = participantsData
                 .where((p) => p['status'] == 'accepted')
@@ -229,8 +234,10 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
             photoUrl, 
             borderColor: Colors.purpleAccent,
           );
-          _markerIconCache[uid] = icon;
+          if (mounted) _markerIconCache[uid] = icon;
         }
+
+        if (!mounted) continue;
 
         final marker = Marker(
           markerId: MarkerId(uid),
@@ -418,6 +425,9 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   void _fitBounds(LatLng destination) {
     if (_mapController == null) return;
 
+    if (_hasFittedCamera) return;
+    _hasFittedCamera = true;
+
     double? minLat, maxLat, minLng, maxLng;
 
     // Include destination in bounds
@@ -459,6 +469,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      if (!mounted) return;
       
       final user = FirebaseAuth.instance.currentUser;
       final photoUrl = user?.photoURL;
@@ -471,16 +482,19 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
           photoUrl, 
           borderColor: AppTheme.primaryBlue,
         );
+        if (!mounted) return;
         _markerIconCache[currentUserId] = icon;
       }
 
       if (mounted) {
-        _selfMarker = Marker(
-          markerId: MarkerId(currentUserId),
-          position: LatLng(pos.latitude, pos.longitude),
-          icon: icon,
-          infoWindow: const InfoWindow(title: 'Me'),
-        );
+        setState(() {
+          _selfMarker = Marker(
+            markerId: MarkerId(currentUserId),
+            position: LatLng(pos.latitude, pos.longitude),
+            icon: icon,
+            infoWindow: const InfoWindow(title: 'Me'),
+          );
+        });
       }
     } catch (e) {
       debugPrint('Error adding self marker: $e');
@@ -576,6 +590,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   // Arrival
   // ─────────────────────────────
   Future<void> _onArrivedPressed(List<String> members) async {
+    if (!mounted) return;
     setState(() => _isArriving = true);
 
     try {
@@ -585,14 +600,14 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         members: members,
       );
 
-      setState(() => _hasArrived = true);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Arrival confirmed 🎉')),
-      );
-
-      // Show summary for current user
       if (mounted) {
+        setState(() => _hasArrived = true);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Arrival confirmed 🎉')),
+        );
+
+        // Show summary for current user
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -601,9 +616,11 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         );
       }
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to confirm arrival')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to confirm arrival')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isArriving = false);
     }
@@ -705,9 +722,9 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
             );
           }
 
-          final List<String> members =
-          (trailData['members'] as List<dynamic>? ?? [])
-              .whereType<String>()
+          final List<dynamic> participantsList = trailData['participants'] ?? [];
+          final List<String> members = participantsList
+              .map((p) => p['userId'].toString())
               .toList();
 
           final String hostId = (trailData['hostId'] ?? '').toString();

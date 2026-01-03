@@ -6,6 +6,12 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app requires your location to show your live position on the map.</string>
 
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

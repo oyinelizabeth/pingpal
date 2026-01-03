@@ -193,6 +193,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       body: SafeArea(
@@ -305,14 +307,24 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       }
 
                       final doc = snap.docs.first;
-                      final GeoPoint dest = doc['destination'];
+                      final participants = doc['participants'] as List<dynamic>? ?? [];
+                      final myPart = participants.firstWhere((p) => p['userId'] == currentUserId, orElse: () => null);
+                      
+                      if (myPart == null || myPart['status'] != 'accepted') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You must accept the pingtrail before sharing location'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
 
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => ActivePingtrailMapPage(
                             pingtrailId: doc.id,
-                            //destination: dest,
                           ),
                         ),
                       );
@@ -365,9 +377,11 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       .collection('ping_trails')
                       .where('members', arrayContains: currentUserId)
                       .where('status', isEqualTo: 'active')
-                      .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _buildQueryError('Error loading active trails. Please try again later.');
+                    }
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
@@ -380,6 +394,14 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       return participants.any((p) =>
                           p['userId'] == currentUserId && p['status'] == 'accepted');
                     }).toList();
+
+                    // Client-side sort if index is missing for orderBy
+                    docs.sort((a, b) {
+                      final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      if (aTime == null || bTime == null) return 0;
+                      return bTime.compareTo(aTime);
+                    });
 
                     if (docs.isEmpty) {
                       return _buildNoActivePingtrail();
@@ -401,6 +423,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
                     );
                   },
                 ),
+
+                const SizedBox(height: 32),
 
                 // Pending Pingtrails Section
                 const Text(
@@ -425,6 +449,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       .where('status', isEqualTo: 'pending')
                       .snapshots(),
                   builder: (context, snapshot) {
+                    if (snapshot.hasError) return const SizedBox();
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return const SizedBox();
                     }
@@ -453,7 +478,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                data['name'],
+                                data['name'] ?? 'Pingtrail',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -475,6 +500,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   },
                 ),
 
+                const SizedBox(height: 40),
+
                 // Past Pingtrails Section
                 const Text(
                   'Past Pingtrails',
@@ -492,9 +519,11 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   stream: FirebaseFirestore.instance
                       .collection('ping_trails')
                       .where('members', arrayContains: currentUserId)
-                      .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _buildQueryError('Error loading past trails.');
+                    }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return const Text(
                         'No past ping_trails',
@@ -520,9 +549,19 @@ class _PingtrailPageState extends State<PingtrailPage> {
                       // 2. OR I have left/rejected it
                       return status == 'completed' || status == 'cancelled' ||
                              myStatus == 'left' || myStatus == 'rejected';
-                    }).take(3).toList(); // Show only last 3 in this preview
+                    }).toList();
 
-                    if (pastTrails.isEmpty) {
+                    // Client-side sort
+                    pastTrails.sort((a, b) {
+                      final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                      if (aTime == null || bTime == null) return 0;
+                      return bTime.compareTo(aTime);
+                    });
+
+                    final previewTrails = pastTrails.take(3).toList();
+
+                    if (previewTrails.isEmpty) {
                       return const Text(
                         'No past ping_trails',
                         style: TextStyle(color: AppTheme.textGray),
@@ -530,7 +569,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                     }
 
                     return Column(
-                      children: pastTrails.map((doc) {
+                      children: previewTrails.map((doc) {
                         return ActivePingtrailCard(
                           doc: doc,
                           onTap: () => _openActivePingtrailPopup(doc),
@@ -783,6 +822,35 @@ class _PingtrailPageState extends State<PingtrailPage> {
               fontSize: 13,
               color: AppTheme.textGray.withOpacity(0.7),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQueryError(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 28),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Check Firebase Console for missing indexes if this persists.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textGray, fontSize: 11),
           ),
         ],
       ),
