@@ -190,7 +190,7 @@ class _ChatPageState extends State<ChatPage> {
 
     if (confirm == true) {
       try {
-        final docRef = FirebaseFirestore.instance.collection('pingtrails').doc(widget.trailId);
+        final docRef = FirebaseFirestore.instance.collection('ping_trails').doc(widget.trailId);
         final doc = await docRef.get();
         if (doc.exists) {
           final data = doc.data()!;

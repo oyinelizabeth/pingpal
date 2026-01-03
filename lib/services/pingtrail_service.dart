@@ -15,7 +15,7 @@ class PingtrailService {
   }) async {
     final uid = _auth.currentUser!.uid;
 
-    final docRef = await _firestore.collection('pingtrails').add({
+    final docRef = await _firestore.collection('ping_trails').add({
       'hostId': uid, // creatorId renamed to hostId
       'name': name,
       'destinationName': destinationName,
@@ -40,7 +40,7 @@ class PingtrailService {
   }) async {
     final uid = userId ?? _auth.currentUser!.uid;
 
-    final docRef = _firestore.collection('pingtrails').doc(pingtrailId);
+    final docRef = _firestore.collection('ping_trails').doc(pingtrailId);
     
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(docRef);

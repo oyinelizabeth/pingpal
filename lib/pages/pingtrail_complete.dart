@@ -40,7 +40,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
   Future<void> _loadTrailSummary() async {
     try {
       final trailDoc = await FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .doc(widget.trailId)
           .get();
 

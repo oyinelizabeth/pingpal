@@ -73,7 +73,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
     }
 
     await FirebaseFirestore.instance
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(pingtrailId)
         .update(updates);
 
@@ -158,7 +158,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
 
     if (confirm == true) {
       await FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .doc(doc.id)
           .update({
         'status': 'cancelled',
@@ -286,7 +286,7 @@ class ActivePingtrailDetailsSheet extends StatelessWidget {
               children: members.map((uid) {
                 return StreamBuilder<DocumentSnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .doc(pingtrailId)
                       .collection('liveLocations')
                       .doc(uid)

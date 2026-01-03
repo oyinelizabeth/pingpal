@@ -227,7 +227,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildActivePingtrailOverview() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .where('status', isEqualTo: 'active')
           .where('members', arrayContains: _currentUserId)
           .snapshots(),
@@ -339,7 +339,7 @@ class _HomePageState extends State<HomePage> {
         // Full-screen Map with ACTIVE PINGTRAILS
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection('pingtrails')
+              .collection('ping_trails')
               .where('status', isEqualTo: 'active')
               .snapshots(),
           builder: (context, snapshot) {
@@ -377,7 +377,7 @@ class _HomePageState extends State<HomePage> {
                   final arrivalTime = arrivalTimestamp.toDate();
                   if (now.isAfter(arrivalTime.add(const Duration(hours: 1)))) {
                     // Update status to 'completed' in Firestore (silently)
-                    FirebaseFirestore.instance.collection('pingtrails').doc(doc.id).update({
+                    FirebaseFirestore.instance.collection('ping_trails').doc(doc.id).update({
                       'status': 'completed',
                       'endedAt': FieldValue.serverTimestamp(),
                     });

@@ -12,7 +12,7 @@ class PingtrailInviteService {
   }) async {
     // Create invitation
     final invitationRef = _firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(pingtrailId)
         .collection('invitations')
         .doc();

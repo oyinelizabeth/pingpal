@@ -176,7 +176,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
           top: false,
           child: StreamBuilder<DocumentSnapshot>(
             stream: _firestore
-                .collection('pingtrails')
+                .collection('ping_trails')
                 .doc(widget.pingtrailId)
                 .snapshots(),
             builder: (context, trailSnap) {
@@ -192,7 +192,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
 
               return StreamBuilder<DocumentSnapshot>(
                 stream: _firestore
-                    .collection('pingtrails')
+                    .collection('ping_trails')
                     .doc(widget.pingtrailId)
                     .collection('invitations')
                     .doc(widget.invitationId)
@@ -325,7 +325,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     if (hostId == null) return;
 
     await _firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(widget.pingtrailId)
         .collection('invitations')
         .doc(widget.invitationId)
@@ -347,7 +347,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
   Future<void> _acceptInvite() async {
     if (hostId == null) return;
 
-    final docRef = _firestore.collection('pingtrails').doc(widget.pingtrailId);
+    final docRef = _firestore.collection('ping_trails').doc(widget.pingtrailId);
     final docSnap = await docRef.get();
 
     if (docSnap.exists) {
@@ -377,7 +377,7 @@ class _PingtrailInvitationPageState extends State<PingtrailInvitationPage>
     }
 
     await _firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(widget.pingtrailId)
         .collection('invitations')
         .doc(widget.invitationId)

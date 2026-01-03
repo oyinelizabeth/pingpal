@@ -8,7 +8,7 @@ import '../theme/app_theme.dart';
 import 'active_pingtrail_map.dart';
 import 'create_pingtrail.dart';
 import 'pingtrail_complete.dart';
-import 'pingtrails_history.dart';
+import 'ping_trails_history.dart';
 import '../widgets/pending_pingtrail_sheet.dart';
 import '../widgets/active_pingtrail_details_sheet.dart';
 import '../widgets/pingtrail_avatar_row.dart';
@@ -40,7 +40,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
   // Accept Pingtrail
   Future<void> acceptPingtrail(String pingtrailId) async {
     final uid = currentUserId;
-    final ref = FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
 
     try {
       await FirebaseFirestore.instance.runTransaction((tx) async {
@@ -120,7 +120,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
   // Decline Pingtrail
   Future<void> declinePingtrail(String pingtrailId) async {
-    final ref = FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
     
     await FirebaseFirestore.instance.runTransaction((tx) async {
       final snap = await tx.get(ref);
@@ -288,7 +288,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       final snap = await FirebaseFirestore.instance
-                          .collection('pingtrails')
+                          .collection('ping_trails')
                           .where('members', arrayContains: currentUserId)
                           .where('status', isEqualTo: 'active')
                           .limit(1)
@@ -362,7 +362,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .where('members', arrayContains: currentUserId)
                       .where('status', isEqualTo: 'active')
                       .orderBy('createdAt', descending: true)
@@ -420,7 +420,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .where('hostId', isEqualTo: currentUserId)
                       .where('status', isEqualTo: 'pending')
                       .snapshots(),
@@ -490,14 +490,14 @@ class _PingtrailPageState extends State<PingtrailPage> {
                 // Past Pingtrail Cards
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('pingtrails')
+                      .collection('ping_trails')
                       .where('members', arrayContains: currentUserId)
                       .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return const Text(
-                        'No past pingtrails',
+                        'No past ping_trails',
                         style: TextStyle(color: AppTheme.textGray),
                       );
                     }
@@ -524,7 +524,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
 
                     if (pastTrails.isEmpty) {
                       return const Text(
-                        'No past pingtrails',
+                        'No past ping_trails',
                         style: TextStyle(color: AppTheme.textGray),
                       );
                     }
@@ -549,7 +549,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const PingtrailsHistoryPage(),
+                        builder: (_) => const Ping_trailsHistoryPage(),
                       ),
                     );
                   },
@@ -607,7 +607,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
   Widget _buildPendingPingtrails() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .where('members', arrayContains: currentUserId)
           .where('status', isEqualTo: 'pending')
           .snapshots(),

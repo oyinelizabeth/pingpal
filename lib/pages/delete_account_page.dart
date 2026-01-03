@@ -75,7 +75,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     // 4. Handle Pingtrails
     // Case A: User is the host -> Delete or Cancel the trail
     final hostedTrails = await firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .where('hostId', isEqualTo: uid)
         .get();
     for (final doc in hostedTrails.docs) {
@@ -87,7 +87,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
     // Case B: User is a participant -> Remove from arrays
     final participatingTrails = await firestore
-        .collection('pingtrails')
+        .collection('ping_trails')
         .where('members', arrayContains: uid)
         .get();
     for (final doc in participatingTrails.docs) {

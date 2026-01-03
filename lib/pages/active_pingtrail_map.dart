@@ -81,7 +81,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   void _listenToTrailChanges() {
     _trailSubscription = FirebaseFirestore.instance
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(widget.pingtrailId)
         .snapshots()
         .listen((trailSnap) async {
@@ -147,7 +147,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       // Arrival Detection
       if (!_hasArrived) {
         final trailSnap = await FirebaseFirestore.instance
-            .collection('pingtrails')
+            .collection('ping_trails')
             .doc(widget.pingtrailId)
             .get();
 
@@ -192,6 +192,11 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       for (var loc in locations) {
         final String uid = loc['userId'];
         if (uid == currentUserId) continue;
+
+        if (loc['location'] == null) {
+          debugPrint('Location for user $uid is null (cache miss/expired)');
+          continue;
+        }
 
         final double lat = (loc['location']['lat'] as num).toDouble();
         final double lng = (loc['location']['lng'] as num).toDouble();
@@ -509,7 +514,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   Future<void> _checkIfAlreadyArrived() async {
     final snap = await FirebaseFirestore.instance
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(widget.pingtrailId)
         .get();
 
@@ -616,7 +621,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
     try {
       await FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .doc(widget.pingtrailId)
           .update({
         'status': 'cancelled',
@@ -664,7 +669,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('pingtrails')
+            .collection('ping_trails')
             .doc(widget.pingtrailId)
             .snapshots(),
         builder: (context, trailSnap) {

@@ -72,7 +72,7 @@ class _ChatListPageState extends State<ChatListPage> with SingleTickerProviderSt
     // We want to fetch all trails the user is part of, then filter in memory
     // because Firestore whereIn/array-contains-any has limits and we have complex logic.
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('pingtrails').snapshots(),
+      stream: FirebaseFirestore.instance.collection('ping_trails').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());

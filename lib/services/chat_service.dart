@@ -41,7 +41,7 @@ class ChatService {
 
   static Future<List<Map<String, dynamic>>> fetchArchivedMessages(String trailId) async {
     final querySnapshot = await FirebaseFirestore.instance
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(trailId)
         .collection('chat_archive')
         .orderBy('timestamp', descending: false)
@@ -53,7 +53,7 @@ class ChatService {
   static Future<void> archiveMessagesToFirestore(String trailId, List<Map<String, dynamic>> messages) async {
     final batch = FirebaseFirestore.instance.batch();
     final archiveCollection = FirebaseFirestore.instance
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(trailId)
         .collection('chat_archive');
 

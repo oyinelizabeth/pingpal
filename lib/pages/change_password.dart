@@ -164,7 +164,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Create a strong password to keep your pingtrails and location data safe.',
+                      'Create a strong password to keep your ping_trails and location data safe.',
                       style: TextStyle(
                         fontSize: 15,
                         color: AppTheme.textGray.withOpacity(0.8),

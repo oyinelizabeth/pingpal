@@ -174,12 +174,12 @@ class _SelectDestinationPageState extends State<SelectDestinationPage> {
       'endedAt': null,
     };
 
-    final docRef = await FirebaseFirestore.instance.collection('pingtrails').add(pingtrailData);
+    final docRef = await FirebaseFirestore.instance.collection('ping_trails').add(pingtrailData);
 
     // Send invitations/notifications
     for (String friendId in widget.selectedFriends) {
       final inviteRef = await FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .doc(docRef.id)
           .collection('invitations')
           .add({

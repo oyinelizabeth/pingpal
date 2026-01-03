@@ -140,7 +140,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       String notificationId,
       ) async {
     final ref =
-    FirebaseFirestore.instance.collection('pingtrails').doc(pingtrailId);
+    FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
 
     try {
       await FirebaseFirestore.instance.runTransaction((tx) async {
@@ -223,7 +223,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       String notificationId,
       ) async {
     await FirebaseFirestore.instance
-        .collection('pingtrails')
+        .collection('ping_trails')
         .doc(pingtrailId)
         .update({
       'members': FieldValue.arrayRemove([currentUserId]),

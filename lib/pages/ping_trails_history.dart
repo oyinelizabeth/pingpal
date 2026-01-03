@@ -7,14 +7,14 @@ import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 import 'pingtrail_complete.dart';
 
-class PingtrailsHistoryPage extends StatefulWidget {
-  const PingtrailsHistoryPage({super.key});
+class Ping_trailsHistoryPage extends StatefulWidget {
+  const Ping_trailsHistoryPage({super.key});
 
   @override
-  State<PingtrailsHistoryPage> createState() => _PingtrailsHistoryPageState();
+  State<Ping_trailsHistoryPage> createState() => _Ping_trailsHistoryPageState();
 }
 
-class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
+class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -127,7 +127,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
           controller: _searchController,
           style: const TextStyle(color: AppTheme.textWhite),
           decoration: const InputDecoration(
-            hintText: 'Search pingtrails',
+            hintText: 'Search ping_trails',
             prefixIcon: Icon(FontAwesomeIcons.magnifyingGlass,
                 size: 16, color: AppTheme.primaryBlue),
             border: InputBorder.none,
@@ -161,7 +161,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   Widget _buildCompletedTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .where('members', arrayContains: currentUserId)
           .snapshots(),
       builder: (context, snapshot) {
@@ -176,7 +176,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
         }).toList();
 
         if (docs.isEmpty) {
-          return _emptyState('No completed pingtrails');
+          return _emptyState('No completed ping_trails');
         }
 
         return ListView(
@@ -193,7 +193,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   Widget _buildCancelledTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('pingtrails')
+          .collection('ping_trails')
           .where('members', arrayContains: currentUserId)
           .snapshots(),
       builder: (context, snapshot) {
@@ -221,7 +221,7 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
         }).toList();
 
         if (filteredDocs.isEmpty) {
-          return _emptyState('No cancelled pingtrails');
+          return _emptyState('No cancelled ping_trails');
         }
 
         return ListView(
