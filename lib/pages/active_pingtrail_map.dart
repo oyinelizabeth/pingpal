@@ -54,9 +54,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   StreamSubscription? _trailSubscription;
 
-  // ─────────────────────────────
   // Lifecycle
-  // ─────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -79,6 +77,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   bool _loopsStarted = false;
 
+  // Listens for participant updates on the active Pingtrail
   void _listenToTrailChanges() {
     _trailSubscription = FirebaseFirestore.instance
         .collection('ping_trails')
@@ -109,6 +108,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     });
   }
 
+  // Starts adaptive writer/reader loops once destination is known
   void _startLoops(LatLng destination) {
     // 1. Writer Loop (Every 5 Seconds)
     _writerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -121,6 +121,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     });
   }
 
+  // Sends current location to backend with network context
   Future<void> _writerLoop() async {
     try {
       // Get GPS position
@@ -136,12 +137,9 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       if (connectivityResult.contains(ConnectivityResult.wifi)) {
         networkType = 'wifi';
       } else if (connectivityResult.contains(ConnectivityResult.mobile)) {
-        // Simple logic for PoC: assume mobile is 4g/3g.
-        // In real app we could use another package for more detail.
         networkType = '4g';
       }
 
-      // Action: Call POST /update
       await LocationApiService.sendLocation(
         userId: currentUserId,
         lat: position.latitude,
@@ -149,7 +147,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         networkType: networkType,
       );
 
-      // Arrival Detection
+      // Detects arrival based on distance threshold
       if (!_hasArrived && mounted) {
         final trailSnap = await FirebaseFirestore.instance
             .collection('ping_trails')
@@ -190,6 +188,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     }
   }
 
+  // Reads cached trail locations and updates markers
   Future<void> _readerLoop(LatLng destination) async {
     try {
       final List<dynamic> locations = await LocationApiService.getTrailLocations(widget.pingtrailId);
@@ -267,12 +266,11 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     } catch (e) {
       if (mounted) {
         debugPrint('Reader loop error: $e');
-        // If the error is 'Failed to load trail locations', it's likely the trailId doesn't exist in Redis yet
-        // or the session hasn't started sending data. We'll just wait for the next tick.
       }
     }
   }
 
+  // Shows participant profile and distance details
   void _showUserDetailSheet(String uid, double distance) {
     final userData = _participantData[uid];
     if (userData == null) return;
@@ -422,6 +420,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     );
   }
 
+  // Fits map camera to all active markers
   void _fitBounds(LatLng destination) {
     if (_mapController == null) return;
 
@@ -459,11 +458,12 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       );
 
       _mapController!.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 70), // 70px padding
+        CameraUpdate.newLatLngBounds(bounds, 70),
       );
     }
   }
 
+  // Adds or updates the current user's map marker
   Future<void> _addSelfMarker() async {
     try {
       final pos = await Geolocator.getCurrentPosition(
@@ -511,9 +511,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     super.dispose();
   }
 
-  // ─────────────────────────────
   // Helpers
-  // ─────────────────────────────
   Future<void> _loadCurrentUserName() async {
     final snap = await FirebaseFirestore.instance
         .collection('users')
@@ -543,9 +541,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     }
   }
 
-  // ─────────────────────────────
   // Camera helpers
-  // ─────────────────────────────
   Future<void> _moveToUserLocation() async {
     if (_mapController == null) return;
 
@@ -586,9 +582,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     );
   }
 
-  // ─────────────────────────────
   // Arrival
-  // ─────────────────────────────
   Future<void> _onArrivedPressed(List<String> members) async {
     if (!mounted) return;
     setState(() => _isArriving = true);
@@ -626,9 +620,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     }
   }
 
-  // ─────────────────────────────
-  // Cancel (host)
-  // ─────────────────────────────
+  // Hosts of a pingtrail can cancel for everyone
   Future<void> _cancelPingtrail(
       String hostId,
       String trailName,
@@ -672,9 +664,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     }
   }
 
-  // ─────────────────────────────
   // UI
-  // ─────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(

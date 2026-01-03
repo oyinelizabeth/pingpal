@@ -7,6 +7,7 @@ class LiveLocationService {
   static StreamSubscription<Position>? _positionStream;
   static Position? _lastPosition;
 
+  // Ensures location services and permissions are granted before tracking
   static Future<bool> _ensurePermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) return false;
 
@@ -19,7 +20,7 @@ class LiveLocationService {
         permission == LocationPermission.whileInUse;
   }
 
-  /// START live tracking (safe)
+  // Starts continuous live location tracking for an active Pingtrail
   static Future<void> start({
     required String pingtrailId,
   }) async {
@@ -31,7 +32,7 @@ class LiveLocationService {
     final hasPermission = await _ensurePermission();
     if (!hasPermission) return;
 
-    await stop(); // prevent duplicate streams
+    await stop(); // Prevents multiple active location streams
 
     final uid = user.uid;
 
@@ -41,6 +42,7 @@ class LiveLocationService {
         distanceFilter: 25,
       ),
     ).listen((position) async {
+      // Filters out insignificant movement to reduce database writes
       if (_lastPosition != null) {
         final distance = Geolocator.distanceBetween(
           _lastPosition!.latitude,
@@ -53,6 +55,7 @@ class LiveLocationService {
 
       _lastPosition = position;
 
+      // Writes live location updates to Firestore for real-time syncing
       await FirebaseFirestore.instance
           .collection('ping_trails')
           .doc(pingtrailId)
@@ -68,7 +71,7 @@ class LiveLocationService {
     });
   }
 
-  /// STOP live tracking
+  // Stops live location tracking and clears cached state
   static Future<void> stop() async {
     await _positionStream?.cancel();
     _positionStream = null;

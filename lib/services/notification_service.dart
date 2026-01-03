@@ -4,11 +4,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
-
   static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _notifications =
   FlutterLocalNotificationsPlugin();
 
+  // Stores notification data in Firestore for in-app notification history
   static Future<void> send({
     required String receiverId,
     required String senderId,
@@ -31,6 +31,7 @@ class NotificationService {
     });
   }
 
+  // Android notification channel configuration for high-priority alerts
   static const AndroidNotificationChannel channel = AndroidNotificationChannel(
     'default_notification_channel',
     'Default Notifications',
@@ -38,12 +39,13 @@ class NotificationService {
     importance: Importance.high,
   );
 
+  // Initialises FCM, local notifications, and token handling
   static Future<void> init() async {
     await _requestPermission();
     await _initLocalNotifications();
     await saveToken();
 
-    // Token refresh
+    // Updates Firestore when the FCM token is refreshed
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
@@ -56,15 +58,16 @@ class NotificationService {
       print('🔄 FCM TOKEN REFRESHED: $newToken');
     });
 
-    // Foreground notifications
+    // Handles foreground push notifications
     FirebaseMessaging.onMessage.listen(_onMessage);
 
-    // Notification click
+    // Handles notification tap events
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       print('📲 Notification clicked: ${message.data}');
     });
   }
 
+  // Requests user permission for push notifications
   static Future<void> _requestPermission() async {
     final settings = await _fcm.requestPermission(
       alert: true,
@@ -74,6 +77,7 @@ class NotificationService {
     print('🔐 Notification permission: ${settings.authorizationStatus}');
   }
 
+  // Sets up local notification support on Android
   static Future<void> _initLocalNotifications() async {
     const androidSettings =
     AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -82,12 +86,14 @@ class NotificationService {
 
     await _notifications.initialize(settings);
 
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+    final androidPlugin =
+    _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
     await androidPlugin?.createNotificationChannel(channel);
   }
 
+  // Displays a local notification when an FCM message is received in foreground
   static void _onMessage(RemoteMessage message) {
     final notification = message.notification;
     if (notification == null) return;
@@ -107,6 +113,7 @@ class NotificationService {
     );
   }
 
+  // Saves the current device FCM token to Firestore for push delivery
   static Future<void> saveToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -125,5 +132,4 @@ class NotificationService {
       print('Error saving FCM token: $e');
     }
   }
-
 }

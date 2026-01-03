@@ -4,13 +4,14 @@ import 'notification_service.dart';
 class PingtrailInviteService {
   static final _firestore = FirebaseFirestore.instance;
 
+  // Creates a Pingtrail invitation and stores it under the trail document
   static Future<void> inviteUser({
     required String pingtrailId,
     required String hostId,
     required String hostName,
     required String invitedUserId,
   }) async {
-    // Create invitation
+    // Stores the invitation with pending status
     final invitationRef = _firestore
         .collection('ping_trails')
         .doc(pingtrailId)
@@ -24,7 +25,7 @@ class PingtrailInviteService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // Send notification
+    // Sends a notification to the invited user
     await NotificationService.send(
       receiverId: invitedUserId,
       senderId: hostId,

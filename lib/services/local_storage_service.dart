@@ -4,12 +4,14 @@ import 'package:path/path.dart';
 class LocalStorageService {
   static Database? _database;
 
+  // Provides a singleton SQLite database instance
   static Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
 
+  // Initialises the local SQLite database for offline message storage
   static Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), 'pingpal_chat.db');
     return await openDatabase(
@@ -30,6 +32,7 @@ class LocalStorageService {
     );
   }
 
+  // Saves a chat message locally for offline access
   static Future<void> saveMessage(Map<String, dynamic> msg) async {
     final db = await database;
     await db.insert(
@@ -39,6 +42,7 @@ class LocalStorageService {
     );
   }
 
+  // Retrieves all messages for a specific Pingtrail in chronological order
   static Future<List<Map<String, dynamic>>> getMessagesForTrail(String trailId) async {
     final db = await database;
     return await db.query(
@@ -49,6 +53,7 @@ class LocalStorageService {
     );
   }
 
+  // Gets the most recent message timestamp for incremental sync
   static Future<int?> getLastTimestamp(String trailId) async {
     final db = await database;
     final result = await db.query(
@@ -65,6 +70,7 @@ class LocalStorageService {
     return null;
   }
 
+  // Clears all locally stored messages
   static Future<void> clearAll() async {
     final db = await database;
     await db.delete('messages');

@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.pingpal"
-        minSdk = flutter.minSdkVersion
+        minSdk = 23
         targetSdk = 36
 
         versionCode = 1

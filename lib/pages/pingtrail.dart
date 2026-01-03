@@ -13,6 +13,7 @@ import '../widgets/pending_pingtrail_sheet.dart';
 import '../widgets/active_pingtrail_details_sheet.dart';
 import '../widgets/pingtrail_avatar_row.dart';
 
+// Main hub for creating, joining, tracking, and reviewing Pingtrails
 class PingtrailPage extends StatefulWidget {
   const PingtrailPage({super.key});
 
@@ -24,7 +25,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
   final int _navIndex = 0;
 
-  // Select Destination
+  // Ensures a destination is selected before creating a Pingtrail
   void validateSelectedDestination(LatLng? selectedLatLng) {
     if (selectedLatLng == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -37,7 +38,8 @@ class _PingtrailPageState extends State<PingtrailPage> {
     }
   }
 
-  // Accept Pingtrail
+  // Accepts a Pingtrail invitation using a Firestore transaction
+  // Ensures consistency when multiple users accept at the same time
   Future<void> acceptPingtrail(String pingtrailId) async {
     final uid = currentUserId;
     final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
@@ -55,6 +57,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
         final List<String> members = List<String>.from(data['members'] ?? []);
         final String hostId = data['hostId'] ?? '';
 
+        // Mark user as accepted
         bool found = false;
         for (var p in participants) {
           if (p['userId'] == uid) {
@@ -64,6 +67,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
           }
         }
 
+        // Add participant if missing
         if (!found) {
           participants.add({
             'userId': uid,
@@ -71,17 +75,17 @@ class _PingtrailPageState extends State<PingtrailPage> {
           });
         }
 
+        // Ensure user exists in members list
         if (!members.contains(uid)) {
           members.add(uid);
         }
 
-        // Update the document
         tx.update(ref, {
           'participants': participants,
           'members': members,
         });
 
-        // Notify host
+        // Notify host of users who have accepted
         if (hostId.isNotEmpty && hostId != uid) {
           await NotificationService.send(
             receiverId: hostId,
@@ -102,7 +106,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
           ),
         );
 
-        // Navigate to live map
+        // Navigate directly to live tracking map
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -118,7 +122,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
     }
   }
 
-  // Decline Pingtrail
+  // Declines a Pingtrail invitation and updates participant status
   Future<void> declinePingtrail(String pingtrailId) async {
     final ref = FirebaseFirestore.instance.collection('ping_trails').doc(pingtrailId);
     
@@ -145,7 +149,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
     });
   }
 
-  // Popup for pending pingtrail
+  // Opens bottom sheet for pending Pingtrail invitations
   void _openPendingPingtrailPopup(QueryDocumentSnapshot doc) {
     showModalBottomSheet(
       context: context,
@@ -162,11 +166,13 @@ class _PingtrailPageState extends State<PingtrailPage> {
       ),
     );
   }
-  // Popup for active pingtrail
+
+  // Opens active Pingtrail details or completion summary
   void _openActivePingtrailPopup(QueryDocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final status = data['status'] ?? 'active';
 
+    // Completed or cancelled trails open summary screen
     if (status == 'completed' || status == 'cancelled') {
       Navigator.push(
         context,
@@ -177,6 +183,7 @@ class _PingtrailPageState extends State<PingtrailPage> {
       return;
     }
 
+    // Active trails open live details sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

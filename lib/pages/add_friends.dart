@@ -27,7 +27,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     super.dispose();
   }
 
-  // 🔍 SEARCH USER BY EMAIL
+  // Searches for a user by email in Firestore
   Future<void> searchUser() async {
     final email = emailController.text.trim().toLowerCase();
 
@@ -70,7 +70,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     });
   }
 
-  // 🚫 CHECK FOR DUPLICATE REQUESTS
+  // Checks if a pending friend request already exists in either direction
   Future<bool> _requestAlreadyExists(String receiverId) async {
     final firestore = FirebaseFirestore.instance;
 
@@ -91,7 +91,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     return outgoing.docs.isNotEmpty || incoming.docs.isNotEmpty;
   }
 
-  // Send friend request
+  // Sends a new friend request and triggers a notification
   Future<void> sendFriendRequest() async {
     if (foundUser == null || isSending || requestSent) return;
 
@@ -101,7 +101,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
     final receiverId = foundUser!['uid'];
 
-    // Prevent duplicate requests
+    // Prevents duplicate friend requests
     final exists = await _requestAlreadyExists(receiverId);
     if (exists) {
       _showMessage('A request already exists');
@@ -109,7 +109,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
       return;
     }
 
-    // Get sender info
     final senderDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(currentUserId)
@@ -135,7 +134,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
       body: '${senderData['fullName']} sent you a ping request',
     );
 
-
     _showMessage('Friend request sent');
 
     setState(() {
@@ -145,6 +143,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     });
   }
 
+  // Displays feedback messages using a snackbar
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

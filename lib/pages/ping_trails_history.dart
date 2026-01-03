@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import '../theme/app_theme.dart';
-import '../widgets/navbar.dart';
 import 'pingtrail_complete.dart';
 
+// Displays a history of the user's past Pingtrails (completed and cancelled)
 class Ping_trailsHistoryPage extends StatefulWidget {
   const Ping_trailsHistoryPage({super.key});
 
@@ -18,14 +17,23 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // Bottom navigation index
   final int _navIndex = 0;
+
+  // Currently authenticated user ID
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
+  // Search controller for filtering trails client-side
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+
+    // Completed and Cancelled tabs
     _tabController = TabController(length: 2, vsync: this);
+
+    // Trigger rebuild when search text changes
     _searchController.addListener(() => setState(() {}));
   }
 
@@ -36,6 +44,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     super.dispose();
   }
 
+  // Filters pingtrail data based on name or destination
   bool _matchesSearch(Map<String, dynamic> data) {
     final query = _searchController.text.toLowerCase().trim();
     if (query.isEmpty) return true;
@@ -47,6 +56,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     return name.contains(query) || destination.contains(query);
   }
 
+  // Opens the completed pingtrail summary page
   void _openCompletedTrail(QueryDocumentSnapshot doc) {
     Navigator.push(
       context,
@@ -69,6 +79,8 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
             _buildSearchBar(),
             const SizedBox(height: 16),
             _buildTabs(),
+
+            // Switches between completed and cancelled history views
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -84,15 +96,17 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     );
   }
 
-  /// Header
+  // Page header with back navigation
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(FontAwesomeIcons.arrowLeft,
-                color: AppTheme.textWhite),
+            icon: const Icon(
+              FontAwesomeIcons.arrowLeft,
+              color: AppTheme.textWhite,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           const Expanded(
@@ -113,6 +127,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     );
   }
 
+  // Search bar for filtering pingtrails locally
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -128,8 +143,11 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
           style: const TextStyle(color: AppTheme.textWhite),
           decoration: const InputDecoration(
             hintText: 'Search ping_trails',
-            prefixIcon: Icon(FontAwesomeIcons.magnifyingGlass,
-                size: 16, color: AppTheme.primaryBlue),
+            prefixIcon: Icon(
+              FontAwesomeIcons.magnifyingGlass,
+              size: 16,
+              color: AppTheme.primaryBlue,
+            ),
             border: InputBorder.none,
           ),
         ),
@@ -137,6 +155,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     );
   }
 
+  // Tab selector between completed and cancelled trails
   Widget _buildTabs() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -157,7 +176,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     );
   }
 
-  /// Completed
+  // Completed pingtrails tab
   Widget _buildCompletedTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -172,16 +191,18 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Filter completed trails and apply search
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final status = data['status'] ?? 'active';
           return status == 'completed' && _matchesSearch(data);
         }).toList();
 
-        // Client-side sort
         docs.sort((a, b) {
-          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final aTime =
+          (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final bTime =
+          (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
           if (aTime == null || bTime == null) return 0;
           return bTime.compareTo(aTime);
         });
@@ -192,15 +213,13 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
 
         return ListView(
           padding: const EdgeInsets.all(24),
-          children: docs
-              .map((doc) => _buildTrailCard(doc, true))
-              .toList(),
+          children: docs.map((doc) => _buildTrailCard(doc, true)).toList(),
         );
       },
     );
   }
 
-  /// Cancelled or left pingtrail
+  // Cancelled or left pingtrails tab
   Widget _buildCancelledTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -217,13 +236,14 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
 
         final docs = snapshot.data!.docs;
 
+        // Determine cancelled or user-left trails
         final filteredDocs = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final status = data['status'];
           final participants = data['participants'] as List<dynamic>? ?? [];
 
           final myParticipant = participants.firstWhere(
-            (p) => p['userId'] == currentUserId,
+                (p) => p['userId'] == currentUserId,
             orElse: () => null,
           );
           final myStatus = myParticipant != null ? myParticipant['status'] : '';
@@ -234,10 +254,12 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
           return (cancelled || userLeft) && _matchesSearch(data);
         }).toList();
 
-        // Client-side sort
+        // Client-side sorting
         filteredDocs.sort((a, b) {
-          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final aTime =
+          (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final bTime =
+          (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
           if (aTime == null || bTime == null) return 0;
           return bTime.compareTo(aTime);
         });
@@ -248,14 +270,14 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
 
         return ListView(
           padding: const EdgeInsets.all(24),
-          children: filteredDocs
-              .map((doc) => _buildTrailCard(doc, false))
-              .toList(),
+          children:
+          filteredDocs.map((doc) => _buildTrailCard(doc, false)).toList(),
         );
       },
     );
   }
 
+  // Displays Firestore query errors
   Widget _buildQueryError(String message) {
     return Center(
       child: Padding(
@@ -282,15 +304,19 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     );
   }
 
-  /// Card
+  // Reusable card UI for displaying a pingtrail entry
   Widget _buildTrailCard(QueryDocumentSnapshot doc, bool completed) {
     final data = doc.data() as Map<String, dynamic>;
     final participants = data['participants'] as List<dynamic>? ?? [];
+
     final myParticipant = participants.firstWhere(
-      (p) => p['userId'] == currentUserId,
+          (p) => p['userId'] == currentUserId,
       orElse: () => null,
     );
-    final bool userLeft = myParticipant != null && (myParticipant['status'] == 'left' || myParticipant['status'] == 'rejected');
+
+    final bool userLeft = myParticipant != null &&
+        (myParticipant['status'] == 'left' ||
+            myParticipant['status'] == 'rejected');
 
     return GestureDetector(
       onTap: () => _openCompletedTrail(doc),
@@ -326,9 +352,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
                       ? FontAwesomeIcons.circleCheck
                       : FontAwesomeIcons.circleXmark,
                   size: 14,
-                  color: completed
-                      ? Colors.green
-                      : Colors.orange,
+                  color: completed ? Colors.green : Colors.orange,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -340,9 +364,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: completed
-                        ? Colors.green
-                        : Colors.orange,
+                    color: completed ? Colors.green : Colors.orange,
                   ),
                 ),
               ],
@@ -353,6 +375,7 @@ class _Ping_trailsHistoryPageState extends State<Ping_trailsHistoryPage>
     );
   }
 
+  // Empty-state UI when no results are found
   Widget _emptyState(String text) {
     return Center(
       child: Text(

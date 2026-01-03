@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/app_theme.dart';
 
+// Bottom sheet shown when a user receives a pending Pingtrail invitation
 class PendingPingtrailDetailsSheet extends StatelessWidget {
   final QueryDocumentSnapshot doc;
   final String currentUserId;
@@ -20,10 +21,13 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = doc.data() as Map<String, dynamic>;
 
+    // Extract participants and members
     final participants = (data['participants'] as List<dynamic>? ?? []);
     final members = (data['members'] as List<dynamic>? ?? [])
         .whereType<String>()
         .toList();
+
+    // IDs of users who have accepted the invitation
     final acceptedIds = participants
         .where((p) => p['status'] == 'accepted')
         .map((p) => p['userId'].toString())
@@ -46,7 +50,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Drag handle
+            // Drag handle indicator
             Center(
               child: Container(
                 width: 40,
@@ -59,7 +63,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
               ),
             ),
 
-            // Trail name
+            // Pingtrail name
             Text(
               trailName,
               style: const TextStyle(
@@ -71,7 +75,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            // Destination
+            // Destination name
             Text(
               destinationName,
               style: TextStyle(
@@ -82,6 +86,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 16),
 
+            // Accepted count summary
             Text(
               '${acceptedIds.length} / ${participants.length} pingpals accepted',
               style: const TextStyle(
@@ -104,14 +109,17 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
 
             const SizedBox(height: 12),
 
+            // List of pingpals and their acceptance status
             PendingPingtrailMembersList(
-              memberIds: participants.map((p) => p['userId'].toString()).toList(),
+              memberIds:
+              participants.map((p) => p['userId'].toString()).toList(),
               acceptedIds: acceptedIds,
               hostId: data['hostId'],
             ),
 
             const SizedBox(height: 28),
 
+            // Accept and decline actions for invited users
             if (!isHost && !hasAccepted)
               Row(
                 children: [
@@ -141,6 +149,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
                 ],
               ),
 
+            // Status message if already accepted
             if (hasAccepted)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -150,6 +159,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
                 ),
               ),
 
+            // Status message for host
             if (isHost)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -165,6 +175,7 @@ class PendingPingtrailDetailsSheet extends StatelessWidget {
   }
 }
 
+// Displays a list of pingpals with acceptance indicators
 class PendingPingtrailMembersList extends StatelessWidget {
   final List<String> memberIds;
   final List<String> acceptedIds;
@@ -186,6 +197,7 @@ class PendingPingtrailMembersList extends StatelessWidget {
       );
     }
 
+    // Fetch user profiles for all members
     return FutureBuilder<QuerySnapshot>(
       future: FirebaseFirestore.instance
           .collection('users')
@@ -211,6 +223,7 @@ class PendingPingtrailMembersList extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: [
+                  // User avatar
                   CircleAvatar(
                     radius: 18,
                     backgroundImage: user['photoUrl'] != null &&
@@ -223,6 +236,8 @@ class PendingPingtrailMembersList extends StatelessWidget {
                         : null,
                   ),
                   const SizedBox(width: 12),
+
+                  // User name
                   Expanded(
                     child: Text(
                       user['fullName'] ?? 'Pingpal',
@@ -233,6 +248,8 @@ class PendingPingtrailMembersList extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // Host / Accepted / Pending indicator
                   if (isHost)
                     const Text(
                       'Host',
@@ -243,7 +260,8 @@ class PendingPingtrailMembersList extends StatelessWidget {
                       ),
                     )
                   else if (hasAccepted)
-                    const Icon(Icons.check_circle, color: Colors.green, size: 18)
+                    const Icon(Icons.check_circle,
+                        color: Colors.green, size: 18)
                   else
                     const Icon(Icons.hourglass_top,
                         color: Colors.orange, size: 18),

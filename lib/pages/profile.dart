@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import '../theme/app_theme.dart';
 import 'edit_profile.dart';
 
+// Displays the current user's profile information
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
@@ -14,12 +16,17 @@ class ProfilePage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppTheme.darkBackground,
         elevation: 0,
-        title: const Text("Profile", style: TextStyle(color: AppTheme.textWhite)),
+        title: const Text(
+          "Profile",
+          style: TextStyle(color: AppTheme.textWhite),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppTheme.textWhite),
           onPressed: () => Navigator.pop(context),
         ),
       ),
+
+      // Live user profile data from Firestore
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
@@ -30,7 +37,9 @@ class ProfilePage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final userData = snapshot.data!.data() as Map<String, dynamic>;
+          final userData =
+          snapshot.data!.data() as Map<String, dynamic>;
+
           final fullName = userData['fullName'] ?? 'User';
           final email = userData['email'] ?? 'No email';
           final photoUrl = userData['photoUrl'] ?? '';
@@ -39,17 +48,24 @@ class ProfilePage extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
+                // Profile avatar
                 CircleAvatar(
                   radius: 45,
                   backgroundColor: AppTheme.inputBackground,
-                  backgroundImage: photoUrl.isNotEmpty
-                      ? NetworkImage(photoUrl)
-                      : null,
+                  backgroundImage:
+                  photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
                   child: photoUrl.isEmpty
-                      ? const Icon(Icons.person, size: 45, color: AppTheme.primaryBlue)
+                      ? const Icon(
+                    Icons.person,
+                    size: 45,
+                    color: AppTheme.primaryBlue,
+                  )
                       : null,
                 ),
+
                 const SizedBox(height: 16),
+
+                // User full name
                 Text(
                   fullName,
                   style: const TextStyle(
@@ -58,19 +74,34 @@ class ProfilePage extends StatelessWidget {
                     color: AppTheme.textWhite,
                   ),
                 ),
+
                 const SizedBox(height: 24),
+
+                // Profile details
                 _profileTile(Icons.email_outlined, "Email", email),
                 const SizedBox(height: 12),
-                _profileTile(Icons.phone_outlined, "Phone", userData['phone'] ?? "Not set"),
+                _profileTile(
+                  Icons.phone_outlined,
+                  "Phone",
+                  userData['phone'] ?? "Not set",
+                ),
                 const SizedBox(height: 12),
-                _profileTile(Icons.lock_outline, "Account Status", "Active"),
+                _profileTile(
+                  Icons.lock_outline,
+                  "Account Status",
+                  "Active",
+                ),
+
                 const Spacer(),
+
+                // Navigate to edit profile
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryBlue,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -85,10 +116,13 @@ class ProfilePage extends StatelessWidget {
                     },
                     child: const Text(
                       "Edit Profile",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
-                )
+                ),
               ],
             ),
           );
@@ -97,12 +131,17 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  static Widget _profileTile(IconData icon, String label, String value) {
+  // Reusable row for profile information
+  static Widget _profileTile(
+      IconData icon, String label, String value) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.borderColor, width: 1.5),
+        border: Border.all(
+          color: AppTheme.borderColor,
+          width: 1.5,
+        ),
         color: AppTheme.cardBackground,
       ),
       child: Row(

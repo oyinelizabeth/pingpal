@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class LocationApiService {
+  // Base URL for the location microservice hosted on Google Cloud
   static const String baseUrl = 'http://34.28.189.176/api/location';
 
+  // Sends the user’s current location to the backend for caching and distribution
   static Future<void> sendLocation({
     required String userId,
     required double lat,
@@ -23,11 +25,13 @@ class LocationApiService {
       }),
     );
 
+    // Throws an error if the backend update fails
     if (response.statusCode != 200) {
       throw Exception('Failed to send location');
     }
   }
 
+  // Retrieves cached live locations for all participants in a Pingtrail
   static Future<List<dynamic>> getTrailLocations(String trailId) async {
     final url = Uri.parse('$baseUrl/trail/$trailId');
     final response = await http.get(url);

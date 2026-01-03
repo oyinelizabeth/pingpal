@@ -7,6 +7,7 @@ import 'package:pingpal/services/local_storage_service.dart';
 
 import '../theme/app_theme.dart';
 
+// Page allowing a user to permanently delete their account and all related data
 class DeleteAccountPage extends StatefulWidget {
   const DeleteAccountPage({super.key});
 
@@ -15,7 +16,10 @@ class DeleteAccountPage extends StatefulWidget {
 }
 
 class _DeleteAccountPageState extends State<DeleteAccountPage> {
+  // Controller for confirming the user's password before deletion
   final TextEditingController _passwordController = TextEditingController();
+
+  // Controls loading state while deletion is in progress
   bool _loading = false;
 
   @override
@@ -24,12 +28,12 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     super.dispose();
   }
 
-  /// 🔥 Delete Firestore user data (including subcollections and references)
+  // Deletes all Firestore data associated with the user - This ensures no orphaned data remains after account deletion
   Future<void> _deleteUserData(String uid) async {
     final firestore = FirebaseFirestore.instance;
     final userRef = firestore.collection('users').doc(uid);
 
-    // 1. Delete user subcollections (specifically pingpals)
+    //  Delete user subcollections (e.g. pingpals)
     final subCollections = ['pingpals'];
     for (final collection in subCollections) {
       final snapshot = await userRef.collection(collection).get();
@@ -38,7 +42,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       }
     }
 
-    // 2. Delete friend requests (as sender OR receiver)
+    // Delete friend requests where the user is sender or receiver
     final sentRequests = await firestore
         .collection('friend_requests')
         .where('senderId', isEqualTo: uid)
@@ -55,7 +59,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       await doc.reference.delete();
     }
 
-    // 3. Delete notifications (as sender OR receiver)
+    // Delete notifications involving the user
     final sentNotifs = await firestore
         .collection('notifications')
         .where('senderId', isEqualTo: uid)
@@ -72,20 +76,17 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       await doc.reference.delete();
     }
 
-    // 4. Handle Pingtrails
-    // Case A: User is the host -> Delete or Cancel the trail
+    // Handle Pingtrails
+    // User is host and deletes their hosted trails
     final hostedTrails = await firestore
         .collection('ping_trails')
         .where('hostId', isEqualTo: uid)
         .get();
     for (final doc in hostedTrails.docs) {
-      // For PoC, we'll mark as cancelled so others can see it ended, 
-      // or just delete it if we want "all records" gone.
-      // Deleting is more aligned with "delete all their records".
       await doc.reference.delete();
     }
 
-    // Case B: User is a participant -> Remove from arrays
+    // User is participant and wants to be removed from pingtrails
     final participatingTrails = await firestore
         .collection('ping_trails')
         .where('members', arrayContains: uid)
@@ -104,13 +105,14 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       });
     }
 
-    // 5. Delete main user document
+    // Delete the main user document
     await userRef.delete();
 
-    // 6. Clear Local DB
+    // Clear locally cached data
     await LocalStorageService.clearAll();
   }
 
+  // Handles full account deletion flow: re-authentication → data deletion → auth account removal
   Future<void> _deleteAccount() async {
     if (_passwordController.text.isEmpty) {
       _showError('Please enter your password');
@@ -127,18 +129,17 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         return;
       }
 
-      // 🔐 Re-authenticate
+      // Re-authenticate user before sensitive action
       final credential = EmailAuthProvider.credential(
         email: user.email!,
         password: _passwordController.text,
       );
-
       await user.reauthenticateWithCredential(credential);
 
-      // 🧹 Delete Firestore data
+      // Delete all Firestore data
       await _deleteUserData(user.uid);
 
-      // ❌ Delete Firebase Auth account
+      // Delete Firebase Authentication account
       await user.delete();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -148,21 +149,22 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         ),
       );
 
-      // 🚪 Navigate to login
+      // Redirect to authentication screen
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const AuthPage()),
-        (route) => false,
+            (route) => false,
       );
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? 'Account deletion failed');
-    } catch (e) {
+    } catch (_) {
       _showError('Something went wrong. Try again.');
     } finally {
       setState(() => _loading = false);
     }
   }
 
+  // Displays an error message using a SnackBar
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -182,6 +184,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Back navigation
               IconButton(
                 icon: const Icon(
                   FontAwesomeIcons.arrowLeft,
@@ -189,7 +192,10 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                 ),
                 onPressed: () => Navigator.pop(context),
               ),
+
               const SizedBox(height: 20),
+
+              // Page title
               const Text(
                 'Delete Account',
                 style: TextStyle(
@@ -198,7 +204,10 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   color: Colors.red,
                 ),
               ),
+
               const SizedBox(height: 12),
+
+              // Warning message
               Text(
                 'This will permanently delete your account and all associated data.',
                 style: TextStyle(
@@ -206,7 +215,10 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   color: AppTheme.textGray.withOpacity(0.8),
                 ),
               ),
+
               const SizedBox(height: 32),
+
+              // Password confirmation
               const Text(
                 'Confirm Password',
                 style: TextStyle(
@@ -215,7 +227,9 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   color: AppTheme.textWhite,
                 ),
               ),
+
               const SizedBox(height: 12),
+
               TextField(
                 controller: _passwordController,
                 obscureText: true,
@@ -229,7 +243,10 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 32),
+
+              // Delete button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -244,13 +261,13 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   child: _loading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text(
-                          'Delete My Account',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
+                    'Delete My Account',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],
