@@ -48,17 +48,11 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   }
 
   void _openCompletedTrail(QueryDocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PingtrailCompletePage(
-          trailName: data['name'],
-          destination: data['destinationName'],
-          duration: '',
-          distance: '',
-          participants: const [],
+          trailId: doc.id,
         ),
       ),
     );
@@ -243,63 +237,70 @@ class _PingtrailsHistoryPageState extends State<PingtrailsHistoryPage>
   /// Card
   Widget _buildTrailCard(QueryDocumentSnapshot doc, bool completed) {
     final data = doc.data() as Map<String, dynamic>;
-    final bool userLeft =
-    (data['leftMembers'] ?? []).contains(currentUserId);
+    final participants = data['participants'] as List<dynamic>? ?? [];
+    final myParticipant = participants.firstWhere(
+      (p) => p['userId'] == currentUserId,
+      orElse: () => null,
+    );
+    final bool userLeft = myParticipant != null && (myParticipant['status'] == 'left' || myParticipant['status'] == 'rejected');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            data['name'] ?? 'Pingtrail',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textWhite,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            data['destinationName'] ?? '',
-            style: const TextStyle(color: AppTheme.textGray),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                completed
-                    ? FontAwesomeIcons.circleCheck
-                    : FontAwesomeIcons.circleXmark,
-                size: 14,
-                color: completed
-                    ? Colors.green
-                    : Colors.orange,
+    return GestureDetector(
+      onTap: () => _openCompletedTrail(doc),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.cardBackground,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              data['name'] ?? 'Pingtrail',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textWhite,
               ),
-              const SizedBox(width: 6),
-              Text(
-                completed
-                    ? 'Completed'
-                    : userLeft
-                    ? 'You left this pingtrail'
-                    : 'Cancelled',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              data['destinationName'] ?? '',
+              style: const TextStyle(color: AppTheme.textGray),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  completed
+                      ? FontAwesomeIcons.circleCheck
+                      : FontAwesomeIcons.circleXmark,
+                  size: 14,
                   color: completed
                       ? Colors.green
                       : Colors.orange,
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 6),
+                Text(
+                  completed
+                      ? 'Completed'
+                      : userLeft
+                      ? 'You left this pingtrail'
+                      : 'Cancelled',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: completed
+                        ? Colors.green
+                        : Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

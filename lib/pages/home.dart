@@ -369,14 +369,18 @@ class _HomePageState extends State<HomePage> {
               final now = DateTime.now();
               for (final doc in snapshot.data!.docs) {
                 final data = doc.data() as Map<String, dynamic>;
+                final status = data['status'] ?? 'active';
                 
                 // Automatic termination: 1 hour after expected time
                 final Timestamp? arrivalTimestamp = data['arrivalTime'];
-                if (arrivalTimestamp != null) {
+                if (status == 'active' && arrivalTimestamp != null) {
                   final arrivalTime = arrivalTimestamp.toDate();
                   if (now.isAfter(arrivalTime.add(const Duration(hours: 1)))) {
                     // Update status to 'completed' in Firestore (silently)
-                    FirebaseFirestore.instance.collection('pingtrails').doc(doc.id).update({'status': 'completed'});
+                    FirebaseFirestore.instance.collection('pingtrails').doc(doc.id).update({
+                      'status': 'completed',
+                      'endedAt': FieldValue.serverTimestamp(),
+                    });
                     continue;
                   }
                 }
@@ -384,7 +388,7 @@ class _HomePageState extends State<HomePage> {
                 final participants = data['participants'] as List<dynamic>? ?? [];
                 final isParticipant = participants.any((p) => p['userId'] == _currentUserId && p['status'] == 'accepted');
                 
-                if (!isParticipant) continue;
+                if (!isParticipant || status != 'active') continue;
 
                 // Capture one active trail to show in the UI indicator
                 activeTrailForIndicator ??= doc;

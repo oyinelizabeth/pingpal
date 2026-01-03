@@ -12,6 +12,7 @@ import '../services/notification_service.dart';
 import '../services/pingtrail_service.dart';
 import '../services/location_api_service.dart';
 import '../utils/marker_helper.dart';
+import 'pingtrail_complete.dart';
 
 class ActivePingtrailMapPage extends StatefulWidget {
   final String pingtrailId;
@@ -252,7 +253,11 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         _fitBounds(destination);
       }
     } catch (e) {
-      debugPrint('Reader loop error: $e');
+      if (mounted) {
+        debugPrint('Reader loop error: $e');
+        // If the error is 'Failed to load trail locations', it's likely the trailId doesn't exist in Redis yet
+        // or the session hasn't started sending data. We'll just wait for the next tick.
+      }
     }
   }
 
@@ -580,6 +585,16 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Arrival confirmed 🎉')),
       );
+
+      // Show summary for current user
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PingtrailCompletePage(trailId: widget.pingtrailId),
+          ),
+        );
+      }
     } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to confirm arrival')),
@@ -621,7 +636,15 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         );
       }
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PingtrailCompletePage(trailId: widget.pingtrailId),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Error cancelling pingtrail: $e');
     }

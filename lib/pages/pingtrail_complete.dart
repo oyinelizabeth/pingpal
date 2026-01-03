@@ -1,22 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
 import '../widgets/navbar.dart';
 
 class PingtrailCompletePage extends StatefulWidget {
-  final String trailName;
-  final String destination;
-  final String duration;
-  final String distance;
-  final List<Map<String, dynamic>> participants;
+  final String trailId;
 
   const PingtrailCompletePage({
     super.key,
-    required this.trailName,
-    required this.destination,
-    required this.duration,
-    required this.distance,
-    required this.participants,
+    required this.trailId,
   });
 
   @override
@@ -27,6 +22,10 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
     with SingleTickerProviderStateMixin {
   final int _navIndex = 0;
   late AnimationController _animationController;
+  
+  Map<String, dynamic>? _trailData;
+  List<Map<String, dynamic>> _participantsInfo = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -35,6 +34,68 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..forward();
+    _loadTrailSummary();
+  }
+
+  Future<void> _loadTrailSummary() async {
+    try {
+      final trailDoc = await FirebaseFirestore.instance
+          .collection('pingtrails')
+          .doc(widget.trailId)
+          .get();
+
+      if (!trailDoc.exists) return;
+
+      final data = trailDoc.data() as Map<String, dynamic>;
+      final List<dynamic> participants = data['participants'] ?? [];
+      final String hostId = data['hostId'] ?? '';
+
+      List<Map<String, dynamic>> participantsInfo = [];
+      
+      for (var p in participants) {
+        final uid = p['userId'];
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final userData = userDoc.data() ?? {};
+        
+        DateTime? arrivedAt;
+        if (p['arrivedAt'] is Timestamp) {
+          arrivedAt = (p['arrivedAt'] as Timestamp).toDate();
+        }
+
+        participantsInfo.add({
+          'uid': uid,
+          'name': userData['fullName'] ?? 'Pingpal',
+          'avatar': userData['photoUrl'] ?? 'https://i.pravatar.cc/150?u=$uid',
+          'isHost': uid == hostId,
+          'arrived': p['status'] == 'arrived',
+          'arrivedAt': arrivedAt,
+          'arrivalTime': arrivedAt != null ? DateFormat('h:mm a').format(arrivedAt) : '---',
+          'timeDiff': arrivedAt != null ? 'Arrived' : (p['status'] == 'left' ? 'Left' : 'Not arrived'),
+        });
+      }
+
+      // Sort: Host first, then arrived, then others
+      participantsInfo.sort((a, b) {
+        if (a['isHost']) return -1;
+        if (b['isHost']) return 1;
+        if (a['arrived'] && !b['arrived']) return -1;
+        if (!a['arrived'] && b['arrived']) return 1;
+        return 0;
+      });
+
+      if (mounted) {
+        setState(() {
+          _trailData = data;
+          _participantsInfo = participantsInfo;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading trail summary: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -44,10 +105,48 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
   }
 
   int get arrivedCount =>
-      widget.participants.where((p) => p["arrived"]).length;
+      _participantsInfo.where((p) => p["arrived"]).length;
+
+  String _calculateDuration() {
+    if (_trailData == null) return '0m';
+    final start = _trailData!['startedAt'] ?? _trailData!['createdAt'];
+    final end = _trailData!['endedAt'];
+    
+    if (start is Timestamp && end is Timestamp) {
+      final diff = end.toDate().difference(start.toDate());
+      if (diff.inHours > 0) {
+        return '${diff.inHours}h ${diff.inMinutes % 60}m';
+      }
+      return '${diff.inMinutes}m';
+    }
+    return '---';
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: AppTheme.darkBackground,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_trailData == null) {
+      return Scaffold(
+        backgroundColor: AppTheme.darkBackground,
+        appBar: AppBar(backgroundColor: Colors.transparent),
+        body: const Center(child: Text('Trail not found', style: TextStyle(color: Colors.white))),
+      );
+    }
+
+    final trailName = _trailData!['name'] ?? 'Pingtrail';
+    final destinationName = _trailData!['destinationName'] ?? 'Destination';
+    final dest = _trailData!['destination'];
+    LatLng? destLatLng;
+    if (dest is GeoPoint) {
+      destLatLng = LatLng(dest.latitude, dest.longitude);
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       body: SafeArea(
@@ -151,7 +250,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
 
                 // Trail Name
                 Text(
-                  widget.trailName,
+                  trailName,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 32,
@@ -184,7 +283,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        widget.destination,
+                        destinationName,
                         style: TextStyle(
                           fontSize: 14,
                           color: AppTheme.textGray.withOpacity(0.9),
@@ -202,14 +301,14 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
                     Expanded(
                       child: _buildStatCard(
                         label: 'DURATION',
-                        value: widget.duration,
+                        value: _calculateDuration(),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildStatCard(
-                        label: 'DISTANCE',
-                        value: widget.distance,
+                        label: 'ARRIVED',
+                        value: '$arrivedCount/${_participantsInfo.length}',
                       ),
                     ),
                   ],
@@ -217,12 +316,55 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
 
                 const SizedBox(height: 32),
 
+                if (destLatLng != null) ...[
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Journey Map',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textWhite,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.borderColor),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: destLatLng,
+                          zoom: 14,
+                        ),
+                        markers: {
+                          Marker(
+                            markerId: const MarkerId('dest'),
+                            position: destLatLng,
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                          ),
+                        },
+                        liteModeEnabled: true,
+                        myLocationEnabled: false,
+                        zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+
                 // Arrival Times Section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Arrival Times',
+                      'Arrival Summary',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -230,7 +372,7 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
                       ),
                     ),
                     Text(
-                      '$arrivedCount of ${widget.participants.length} arrived',
+                      '$arrivedCount of ${_participantsInfo.length} arrived',
                       style: TextStyle(
                         fontSize: 14,
                         color: AppTheme.textGray.withOpacity(0.8),
@@ -242,10 +384,10 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
                 const SizedBox(height: 20),
 
                 // Participants List
-                ...widget.participants.asMap().entries.map((entry) {
+                ..._participantsInfo.asMap().entries.map((entry) {
                   final index = entry.key;
                   final participant = entry.value;
-                  final isLast = index == widget.participants.length - 1;
+                  final isLast = index == _participantsInfo.length - 1;
                   return _buildParticipantItem(participant, isLast);
                 }),
 
@@ -421,6 +563,15 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
                         color: AppTheme.textGray,
                       ),
                     ),
+                  ] else if (arrived) ...[
+                     const SizedBox(height: 2),
+                     const Text(
+                      'Arrived',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.green,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -438,13 +589,13 @@ class _PingtrailCompletePageState extends State<PingtrailCompletePage>
                     color: AppTheme.textWhite,
                   ),
                 ),
-                if (timeDiff.isNotEmpty) ...[
+                if (timeDiff.isNotEmpty && !arrived) ...[
                   const SizedBox(height: 2),
                   Text(
                     timeDiff,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: Colors.green,
+                      color: timeDiff == 'Left' ? Colors.orange : AppTheme.textGray,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

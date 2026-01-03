@@ -7,6 +7,7 @@ import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'active_pingtrail_map.dart';
 import 'create_pingtrail.dart';
+import 'pingtrail_complete.dart';
 import 'pingtrails_history.dart';
 import '../widgets/pending_pingtrail_sheet.dart';
 import '../widgets/active_pingtrail_details_sheet.dart';
@@ -163,6 +164,19 @@ class _PingtrailPageState extends State<PingtrailPage> {
   }
   // Popup for active pingtrail
   void _openActivePingtrailPopup(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final status = data['status'] ?? 'active';
+
+    if (status == 'completed' || status == 'cancelled') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PingtrailCompletePage(trailId: doc.id),
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

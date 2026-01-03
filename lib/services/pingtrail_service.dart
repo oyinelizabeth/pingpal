@@ -40,11 +40,36 @@ class PingtrailService {
   }) async {
     final uid = userId ?? _auth.currentUser!.uid;
 
-    await _firestore
-        .collection('pingtrails')
-        .doc(pingtrailId)
-        .update({
-      'arrivedMembers': FieldValue.arrayUnion([uid]),
+    final docRef = _firestore.collection('pingtrails').doc(pingtrailId);
+    
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists) return;
+
+      final data = snapshot.data() as Map<String, dynamic>;
+      final List<dynamic> participants = List.from(data['participants'] ?? []);
+      
+      bool updated = false;
+      for (var p in participants) {
+        if (p['userId'] == uid) {
+          p['status'] = 'arrived';
+          p['arrivedAt'] = FieldValue.serverTimestamp();
+          updated = true;
+          break;
+        }
+      }
+
+      if (updated) {
+        transaction.update(docRef, {
+          'participants': participants,
+          'arrivedMembers': FieldValue.arrayUnion([uid]),
+        });
+      } else {
+        // If not in participants (shouldn't happen), still add to arrivedMembers
+        transaction.update(docRef, {
+          'arrivedMembers': FieldValue.arrayUnion([uid]),
+        });
+      }
     });
   }
 
