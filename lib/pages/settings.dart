@@ -37,13 +37,14 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(
-                      FontAwesomeIcons.arrowLeft,
-                      color: AppTheme.textWhite,
+                  if (Navigator.canPop(context))
+                    IconButton(
+                      icon: const Icon(
+                        FontAwesomeIcons.arrowLeft,
+                        color: AppTheme.textWhite,
+                      ),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
                   const Expanded(
                     child: Center(
                       child: Text(
@@ -56,7 +57,10 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 48), // Balance
+                  if (Navigator.canPop(context))
+                    const SizedBox(width: 48)
+                  else
+                    const SizedBox(width: 16),
                 ],
               ),
             ),
