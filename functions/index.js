@@ -20,6 +20,18 @@ exports.onPingtrailCreated = onDocumentCreated(
       const members = (data.members || []).filter((id) => id !== hostId);
       if (!members.length) return;
 
+      // Get host's name
+      const hostSnap = await admin
+          .firestore()
+          .collection("users")
+          .doc(hostId)
+          .get();
+
+      const hostName = hostSnap.exists ?
+        hostSnap.data().fullName || "A user" :
+        "A user";
+
+      // Get invited members' tokens
       const usersSnap = await admin
           .firestore()
           .collection("users")
@@ -32,11 +44,12 @@ exports.onPingtrailCreated = onDocumentCreated(
 
       if (!tokens.length) return;
 
+      // Send notification
       await admin.messaging().sendEachForMulticast({
         tokens,
         notification: {
           title: "New Pingtrail Invite 🚶‍♂️",
-          body: `${data.name} invited you to a Pingtrail`,
+          body: `${hostName} invited you to a Pingtrail`, // <- sender's name
         },
         android: {
           priority: "high",
@@ -121,53 +134,86 @@ exports.onFriendRequestStatusChanged = onDocumentUpdated(
 
       if (!beforeData || !afterData) return;
 
-      // Only trigger if status changed
+      // 🔹 Only trigger if status changed
       if (beforeData.status === afterData.status) return;
 
       const senderId = afterData.senderId;
-      const receiverName = afterData.receiverName || "Someone";
+      const receiverId = afterData.receiverId;
 
-      // Get sender's FCM token
+      if (!senderId || !receiverId) return;
+
+      // 🔹 Fetch sender (notification receiver)
       const senderSnap = await admin
           .firestore()
           .collection("users")
           .doc(senderId)
           .get();
 
+      if (!senderSnap.exists) return;
+
       const senderData = senderSnap.data();
-      if (!senderData) return;
+      if (!senderData || !senderData.fcmToken) return;
 
       const senderToken = senderData.fcmToken;
-      if (!senderToken) return;
+
+      // 🔹 Fetch receiver (for name)
+      const receiverSnap = await admin
+          .firestore()
+          .collection("users")
+          .doc(receiverId)
+          .get();
+
+      let receiverName = "Someone";
+
+      if (receiverSnap.exists) {
+        const receiverData = receiverSnap.data();
+
+        if (receiverData) {
+          receiverName =
+          receiverData.name ||
+          receiverData.displayName ||
+          receiverData.fullName ||
+          receiverData.username ||
+          "Someone";
+        }
+      }
 
       let title = "";
       let body = "";
 
       if (afterData.status === "accepted") {
         title = "You are now friends 🎉";
-        body = `${receiverName} accepted your friend request`;
+        body = receiverName + " accepted your friend request";
       } else if (afterData.status === "rejected") {
         title = "Friend request rejected ❌";
-        body = `${receiverName} rejected your friend request`;
+        body = receiverName + " rejected your friend request";
       } else {
         return;
       }
 
       await admin.messaging().send({
         token: senderToken,
-        notification: {title, body},
+        notification: {
+          title: title,
+          body: body,
+        },
         android: {
           priority: "high",
-          notification: {channelId: "default_notification_channel"},
+          notification: {
+            channelId: "default_notification_channel",
+          },
         },
         data: {
-          type: `friend_request_${afterData.status}`,
-          receiverId: afterData.receiverId,
+          type: "friend_request_" + afterData.status,
+          receiverId: receiverId,
         },
       });
 
       console.log(
-          `Friend request ${afterData.status} notification sent to ${senderId}`,
+          "Friend request " +
+        afterData.status +
+        " notification sent to " +
+        senderId,
       );
     },
 );
