@@ -11,6 +11,7 @@ import '../services/live_location_service.dart';
 import '../services/notification_service.dart';
 import '../services/pingtrail_service.dart';
 import '../services/location_api_service.dart';
+import '../utils/marker_helper.dart';
 
 class ActivePingtrailMapPage extends StatefulWidget {
   final String pingtrailId;
@@ -37,12 +38,14 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   String _currentUserName = 'A user';
 
-  final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
 
   Timer? _writerTimer;
   Timer? _readerTimer;
   Map<String, Marker> _friendMarkers = {};
+  Marker? _selfMarker;
+  Marker? _destinationMarker;
+  final Map<String, BitmapDescriptor> _markerIconCache = {};
   
   // Cache for participant data (name, photo, bio)
   final Map<String, Map<String, dynamic>> _participantData = {};
@@ -185,60 +188,67 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     try {
       final List<dynamic> locations = await LocationApiService.getTrailLocations(widget.pingtrailId);
 
-      setState(() {
-        for (var loc in locations) {
-          final String uid = loc['userId'];
-          if (uid == currentUserId) continue;
+      for (var loc in locations) {
+        final String uid = loc['userId'];
+        if (uid == currentUserId) continue;
 
-          final double lat = (loc['location']['lat'] as num).toDouble();
-          final double lng = (loc['location']['lng'] as num).toDouble();
+        final double lat = (loc['location']['lat'] as num).toDouble();
+        final double lng = (loc['location']['lng'] as num).toDouble();
 
-          final userData = _participantData[uid];
-          final String name = userData?['fullName'] ?? 'Friend';
-          
-          String distanceText = '';
-          double? distanceMeters;
-          if (_lastSelfPosition != null) {
-            distanceMeters = Geolocator.distanceBetween(
-              _lastSelfPosition!.latitude,
-              _lastSelfPosition!.longitude,
-              lat,
-              lng,
-            );
-            if (distanceMeters < 1000) {
-              distanceText = '${distanceMeters.toStringAsFixed(0)}m away';
-            } else {
-              distanceText = '${(distanceMeters / 1000).toStringAsFixed(1)}km away';
-            }
-          }
-
-          final marker = Marker(
-            markerId: MarkerId(uid),
-            position: LatLng(lat, lng),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-            infoWindow: InfoWindow(
-              title: name,
-              snippet: distanceText.isNotEmpty ? distanceText : null,
-            ),
-            onTap: () {
-              if (distanceMeters != null) {
-                _showUserDetailSheet(uid, distanceMeters);
-              }
-            },
+        final userData = _participantData[uid];
+        final String name = userData?['fullName'] ?? 'Friend';
+        final String? photoUrl = userData?['photoUrl'];
+        
+        String distanceText = '';
+        double? distanceMeters;
+        if (_lastSelfPosition != null) {
+          distanceMeters = Geolocator.distanceBetween(
+            _lastSelfPosition!.latitude,
+            _lastSelfPosition!.longitude,
+            lat,
+            lng,
           );
-
-          _friendMarkers[uid] = marker;
+          if (distanceMeters < 1000) {
+            distanceText = '${distanceMeters.toStringAsFixed(0)}m away';
+          } else {
+            distanceText = '${(distanceMeters / 1000).toStringAsFixed(1)}km away';
+          }
         }
 
-        // Repaint all markers
-        _markers.clear();
-        _markers.addAll(_friendMarkers.values);
-      });
+        BitmapDescriptor icon;
+        if (_markerIconCache.containsKey(uid)) {
+          icon = _markerIconCache[uid]!;
+        } else {
+          icon = await MarkerHelper.getMarkerWithImage(
+            photoUrl, 
+            borderColor: Colors.purpleAccent,
+          );
+          _markerIconCache[uid] = icon;
+        }
 
-      // Add self marker (Blue) and then fit camera
+        final marker = Marker(
+          markerId: MarkerId(uid),
+          position: LatLng(lat, lng),
+          icon: icon,
+          infoWindow: InfoWindow(
+            title: name,
+            snippet: distanceText.isNotEmpty ? distanceText : null,
+          ),
+          onTap: () {
+            if (distanceMeters != null) {
+              _showUserDetailSheet(uid, distanceMeters);
+            }
+          },
+        );
+
+        _friendMarkers[uid] = marker;
+      }
+
+      // Add self marker (Blue)
       await _addSelfMarker();
       
       if (mounted) {
+        setState(() {}); // Trigger build to update markers from components
         _fitBounds(destination);
       }
     } catch (e) {
@@ -406,7 +416,13 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     minLng = destination.longitude;
     maxLng = destination.longitude;
 
-    for (final marker in _markers) {
+    final allMarkers = {
+      if (_selfMarker != null) _selfMarker!,
+      if (_destinationMarker != null) _destinationMarker!,
+      ..._friendMarkers.values,
+    };
+
+    for (final marker in allMarkers) {
       final lat = marker.position.latitude;
       final lng = marker.position.longitude;
 
@@ -433,17 +449,28 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      
+      final user = FirebaseAuth.instance.currentUser;
+      final photoUrl = user?.photoURL;
+      
+      BitmapDescriptor icon;
+      if (_markerIconCache.containsKey(currentUserId)) {
+        icon = _markerIconCache[currentUserId]!;
+      } else {
+        icon = await MarkerHelper.getMarkerWithImage(
+          photoUrl, 
+          borderColor: AppTheme.primaryBlue,
+        );
+        _markerIconCache[currentUserId] = icon;
+      }
+
       if (mounted) {
-        setState(() {
-          _markers.add(
-            Marker(
-              markerId: MarkerId(currentUserId),
-              position: LatLng(pos.latitude, pos.longitude),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-              infoWindow: const InfoWindow(title: 'Me'),
-            ),
-          );
-        });
+        _selfMarker = Marker(
+          markerId: MarkerId(currentUserId),
+          position: LatLng(pos.latitude, pos.longitude),
+          icon: icon,
+          infoWindow: const InfoWindow(title: 'Me'),
+        );
       }
     } catch (e) {
       debugPrint('Error adding self marker: $e');
@@ -659,6 +686,14 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
           final String trailName =
           (trailData['destinationName'] ?? 'Pingtrail').toString();
 
+          // Update destination marker
+          _destinationMarker = Marker(
+            markerId: const MarkerId('destination'),
+            position: destination,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            infoWindow: InfoWindow(title: trailName, snippet: 'Destination'),
+          );
+
           // Start loops once destination is known
           if (!_loopsStarted) {
             _loopsStarted = true;
@@ -667,16 +702,6 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
             });
           }
 
-          // Ensure destination marker is in _markers
-          _markers.add(
-            Marker(
-              markerId: const MarkerId('destination'),
-              position: destination,
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-              infoWindow: InfoWindow(title: trailName, snippet: 'Destination'),
-            ),
-          );
-
           return Stack(
             children: [
               GoogleMap(
@@ -684,7 +709,11 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                   target: destination,
                   zoom: 13,
                 ),
-                markers: _markers,
+                markers: {
+                  if (_selfMarker != null) _selfMarker!,
+                  if (_destinationMarker != null) _destinationMarker!,
+                  ..._friendMarkers.values,
+                },
                 polylines: _polylines,
                 myLocationEnabled: true,
                 myLocationButtonEnabled: true,
