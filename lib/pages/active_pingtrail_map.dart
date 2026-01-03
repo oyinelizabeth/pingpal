@@ -27,11 +27,15 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   final PingtrailService _pingtrailService = PingtrailService();
 
   GoogleMapController? _mapController;
-  bool _cameraFitted = false;
 
   bool _hasArrived = false;
   bool _isArriving = false;
+  bool _hasFittedCamera = false;
+
   String _currentUserName = 'A user';
+
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
 
   // ─────────────────────────────
   // Lifecycle
@@ -53,6 +57,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     _loadCurrentUserName();
     _checkIfAlreadyArrived();
 
+    /// 🔑 IMPORTANT: write GPS immediately (fixes US location issue)
     LiveLocationService.start(pingtrailId: widget.pingtrailId);
   }
 
@@ -64,40 +69,6 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   // ─────────────────────────────
   // Helpers
-  // ─────────────────────────────
-  bool _isActive(Timestamp? updatedAt) {
-    if (updatedAt == null) return false;
-    return DateTime.now()
-        .difference(updatedAt.toDate())
-        .inMinutes <=
-        3;
-  }
-
-  Future<void> _fitCamera(Set<LatLng> points) async {
-    if (_mapController == null || points.isEmpty) return;
-
-    double? minLat, maxLat, minLng, maxLng;
-
-    for (final p in points) {
-      minLat = minLat == null ? p.latitude : minLat < p.latitude ? minLat : p.latitude;
-      maxLat = maxLat == null ? p.latitude : maxLat > p.latitude ? maxLat : p.latitude;
-      minLng = minLng == null ? p.longitude : minLng < p.longitude ? minLng : p.longitude;
-      maxLng = maxLng == null ? p.longitude : maxLng > p.longitude ? maxLng : p.longitude;
-    }
-
-    await _mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat!, minLng!),
-          northeast: LatLng(maxLat!, maxLng!),
-        ),
-        80,
-      ),
-    );
-  }
-
-  // ─────────────────────────────
-  // Load user name
   // ─────────────────────────────
   Future<void> _loadCurrentUserName() async {
     final snap = await FirebaseFirestore.instance
@@ -111,9 +82,6 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     }
   }
 
-  // ─────────────────────────────
-  // Arrival state
-  // ─────────────────────────────
   Future<void> _checkIfAlreadyArrived() async {
     final snap = await FirebaseFirestore.instance
         .collection('pingtrails')
@@ -130,6 +98,52 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     }
   }
 
+  // ─────────────────────────────
+  // Camera helpers
+  // ─────────────────────────────
+  Future<void> _moveToUserLocation() async {
+    if (_mapController == null) return;
+
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(pos.latitude, pos.longitude),
+        14,
+      ),
+    );
+  }
+
+  Future<void> _fitCamera(Set<LatLng> points) async {
+    if (_mapController == null || points.length < 2) return;
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final p in points) {
+      minLat = p.latitude < minLat ? p.latitude : minLat;
+      maxLat = p.latitude > maxLat ? p.latitude : maxLat;
+      minLng = p.longitude < minLng ? p.longitude : minLng;
+      maxLng = p.longitude > maxLng ? p.longitude : maxLng;
+    }
+
+    final bounds = LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 80),
+    );
+  }
+
+  // ─────────────────────────────
+  // Arrival
+  // ─────────────────────────────
   Future<void> _onArrivedPressed(List<String> members) async {
     setState(() => _isArriving = true);
 
@@ -145,13 +159,17 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Arrival confirmed 🎉')),
       );
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to confirm arrival')),
+      );
     } finally {
       if (mounted) setState(() => _isArriving = false);
     }
   }
 
   // ─────────────────────────────
-  // Host cancel
+  // Cancel (host)
   // ─────────────────────────────
   Future<void> _cancelPingtrail(
       String hostId,
@@ -206,13 +224,13 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final trail =
-          trailSnap.data!.data() as Map<String, dynamic>;
-
+          final trail = trailSnap.data!.data() as Map<String, dynamic>;
           if (trail['destination'] is! GeoPoint) {
             return const Center(
-              child: Text('Destination not set',
-                  style: TextStyle(color: Colors.white)),
+              child: Text(
+                'Destination not set',
+                style: TextStyle(color: Colors.white),
+              ),
             );
           }
 
@@ -225,126 +243,131 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
               .whereType<String>()
               .toList();
 
-          final String hostId =
-          (trail['creatorId'] ?? '').toString();
+          final String hostId = (trail['creatorId'] ?? '').toString();
           final String trailName =
           (trail['destinationName'] ?? 'Pingtrail').toString();
 
-          return Stack(
-            children: [
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('pingtrails')
-                    .doc(widget.pingtrailId)
-                    .collection('liveLocations')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  final Set<Marker> markers = {
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('pingtrails')
+                .doc(widget.pingtrailId)
+                .collection('liveLocations')
+                .snapshots(),
+            builder: (context, snapshot) {
+              _markers.clear();
+              _polylines.clear();
+
+              final Set<LatLng> cameraPoints = {destination};
+
+              _markers.add(
+                Marker(
+                  markerId: const MarkerId('destination'),
+                  position: destination,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueGreen,
+                  ),
+                ),
+              );
+
+              if (snapshot.hasData) {
+                for (final doc in snapshot.data!.docs) {
+                  final raw = doc.data() as Map<String, dynamic>;
+                  if (raw['location'] is! GeoPoint) continue;
+
+                  final GeoPoint gp = raw['location'];
+                  final LatLng loc =
+                  LatLng(gp.latitude, gp.longitude);
+                  final String uid = doc.id;
+
+                  cameraPoints.add(loc);
+
+                  _markers.add(
                     Marker(
-                      markerId: const MarkerId('destination'),
-                      position: destination,
+                      markerId: MarkerId(uid),
+                      position: loc,
                       icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueGreen,
+                        uid == currentUserId
+                            ? BitmapDescriptor.hueAzure
+                            : BitmapDescriptor.hueRed,
                       ),
                     ),
-                  };
+                  );
 
-                  final Set<Polyline> polylines = {};
-                  final Set<LatLng> activePoints = {destination};
+                  _polylines.add(
+                    Polyline(
+                      polylineId: PolylineId(uid),
+                      points: [loc, destination],
+                      color: uid == currentUserId
+                          ? AppTheme.primaryBlue
+                          : AppTheme.primaryBlue.withOpacity(0.35),
+                      width: uid == currentUserId ? 6 : 4,
+                    ),
+                  );
+                }
+              }
 
-                  if (snapshot.hasData) {
-                    for (final doc in snapshot.data!.docs) {
-                      final raw =
-                      doc.data() as Map<String, dynamic>;
-                      if (raw['location'] is! GeoPoint) continue;
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                if (!_hasFittedCamera &&
+                    cameraPoints.length > 1 &&
+                    _mapController != null) {
+                  _hasFittedCamera = true;
+                  await _fitCamera(cameraPoints);
+                } else if (_mapController != null &&
+                    cameraPoints.length == 1) {
+                  await _moveToUserLocation();
+                }
+              });
 
-                      final GeoPoint gp = raw['location'];
-                      final LatLng loc =
-                      LatLng(gp.latitude, gp.longitude);
-                      final String uid = doc.id;
-
-                      final bool active =
-                      _isActive(raw['updatedAt'] as Timestamp?);
-
-                      if (active) activePoints.add(loc);
-
-                      polylines.add(
-                        Polyline(
-                          polylineId: PolylineId(uid),
-                          points: [loc, destination],
-                          color: uid == currentUserId
-                              ? AppTheme.primaryBlue
-                              : AppTheme.primaryBlue.withOpacity(0.35),
-                          width: uid == currentUserId ? 6 : 4,
-                        ),
-                      );
-
-                      markers.add(
-                        Marker(
-                          markerId: MarkerId(uid),
-                          position: loc,
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                            uid == currentUserId
-                                ? BitmapDescriptor.hueAzure
-                                : active
-                                ? BitmapDescriptor.hueRed
-                                : BitmapDescriptor.hueOrange,
-                          ),
-                        ),
-                      );
-                    }
-                  }
-
-                  if (!_cameraFitted &&
-                      _mapController != null &&
-                      activePoints.length > 1) {
-                    _cameraFitted = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _fitCamera(activePoints);
-                    });
-                  }
-
-                  return GoogleMap(
-                    initialCameraPosition:
-                    CameraPosition(target: destination, zoom: 13),
-                    markers: markers,
-                    polylines: polylines,
+              return Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: destination,
+                      zoom: 13,
+                    ),
+                    markers: _markers,
+                    polylines: _polylines,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: true,
                     onMapCreated: (c) => _mapController = c,
-                  );
-                },
-              ),
-
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 20,
-                child: ElevatedButton.icon(
-                  onPressed: _hasArrived || _isArriving
-                      ? null
-                      : () => _onArrivedPressed(members),
-                  icon: const Icon(Icons.flag),
-                  label: Text(
-                    _hasArrived
-                        ? 'Arrival confirmed'
-                        : "I've arrived",
                   ),
-                ),
-              ),
 
-              if (currentUserId == hostId)
-                Positioned(
-                  top: 20,
-                  right: 20,
-                  child: IconButton(
-                    icon:
-                    const Icon(Icons.close, color: Colors.red),
-                    onPressed: () =>
-                        _cancelPingtrail(hostId, trailName, members),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
+                    child: ElevatedButton.icon(
+                      onPressed: _hasArrived || _isArriving
+                          ? null
+                          : () => _onArrivedPressed(members),
+                      icon: const Icon(Icons.flag),
+                      label: Text(
+                        _hasArrived
+                            ? 'Arrival confirmed'
+                            : "I've arrived",
+                      ),
+                    ),
                   ),
-                ),
-            ],
+
+                  if (currentUserId == hostId)
+                    Positioned(
+                      top: 20,
+                      right: 20,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.red,
+                        ),
+                        onPressed: () => _cancelPingtrail(
+                          hostId,
+                          trailName,
+                          members,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           );
         },
       ),
