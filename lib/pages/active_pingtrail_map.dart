@@ -43,6 +43,10 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   Timer? _writerTimer;
   Timer? _readerTimer;
   Map<String, Marker> _friendMarkers = {};
+  
+  // Cache for participant data (name, photo, bio)
+  final Map<String, Map<String, dynamic>> _participantData = {};
+  Position? _lastSelfPosition;
 
   // ─────────────────────────────
   // Lifecycle
@@ -62,9 +66,40 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     currentUserId = user.uid;
 
     _loadCurrentUserName();
+    _loadParticipantData();
     _checkIfAlreadyArrived();
 
     _startLoops();
+  }
+
+  Future<void> _loadParticipantData() async {
+    try {
+      final trailSnap = await FirebaseFirestore.instance
+          .collection('pingtrails')
+          .doc(widget.pingtrailId)
+          .get();
+
+      if (trailSnap.exists) {
+        final List<dynamic> participants = trailSnap.data()?['participants'] ?? [];
+        for (var p in participants) {
+          final String uid = p['userId'];
+          if (uid == currentUserId) continue;
+
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          
+          if (userDoc.exists && mounted) {
+            setState(() {
+              _participantData[uid] = userDoc.data()!;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading participant data: $e');
+    }
   }
 
   void _startLoops() {
@@ -81,6 +116,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      _lastSelfPosition = position;
 
       // Get Network Status
       final List<ConnectivityResult> connectivityResult = await Connectivity().checkConnectivity();
@@ -153,11 +189,38 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
           final double lat = (loc['location']['lat'] as num).toDouble();
           final double lng = (loc['location']['lng'] as num).toDouble();
 
+          final userData = _participantData[uid];
+          final String name = userData?['fullName'] ?? 'Friend';
+          
+          String distanceText = '';
+          double? distanceMeters;
+          if (_lastSelfPosition != null) {
+            distanceMeters = Geolocator.distanceBetween(
+              _lastSelfPosition!.latitude,
+              _lastSelfPosition!.longitude,
+              lat,
+              lng,
+            );
+            if (distanceMeters < 1000) {
+              distanceText = '${distanceMeters.toStringAsFixed(0)}m away';
+            } else {
+              distanceText = '${(distanceMeters / 1000).toStringAsFixed(1)}km away';
+            }
+          }
+
           final marker = Marker(
             markerId: MarkerId(uid),
             position: LatLng(lat, lng),
             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-            infoWindow: InfoWindow(title: 'Friend ($uid)'),
+            infoWindow: InfoWindow(
+              title: name,
+              snippet: distanceText.isNotEmpty ? distanceText : null,
+            ),
+            onTap: () {
+              if (distanceMeters != null) {
+                _showUserDetailSheet(uid, distanceMeters);
+              }
+            },
           );
 
           _friendMarkers[uid] = marker;
@@ -166,27 +229,219 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         // Repaint all markers
         _markers.clear();
         _markers.addAll(_friendMarkers.values);
-
-        // Add self marker (Blue)
-        _addSelfMarker();
       });
+
+      // Add self marker (Blue) and then fit camera
+      await _addSelfMarker();
+      
+      if (_markers.isNotEmpty && mounted) {
+        _fitBounds();
+      }
     } catch (e) {
       debugPrint('Reader loop error: $e');
     }
   }
 
-  Future<void> _addSelfMarker() async {
-    final pos = await Geolocator.getCurrentPosition();
-    setState(() {
-      _markers.add(
-        Marker(
-          markerId: MarkerId(currentUserId),
-          position: LatLng(pos.latitude, pos.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          infoWindow: const InfoWindow(title: 'Me'),
+  void _showUserDetailSheet(String uid, double distance) {
+    final userData = _participantData[uid];
+    if (userData == null) return;
+
+    final String name = userData['fullName'] ?? 'Pingpal';
+    final String email = userData['email'] ?? '';
+    final String bio = userData['bio'] ?? 'No bio available';
+    final String photoUrl = userData['photoUrl'] ?? '';
+    
+    String distanceStr = distance < 1000 
+        ? '${distance.toStringAsFixed(0)} meters' 
+        : '${(distance / 1000).toStringAsFixed(1)} km';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: AppTheme.cardBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.textGray.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 35,
+                  backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                  backgroundColor: AppTheme.primaryBlue.withOpacity(0.2),
+                  child: photoUrl.isEmpty 
+                      ? const Icon(Icons.person, color: AppTheme.primaryBlue, size: 35) 
+                      : null,
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textWhite,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        email,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textGray.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.darkBackground.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.borderColor.withOpacity(0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.directions_walk, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Current Distance:',
+                    style: TextStyle(color: AppTheme.textGray),
+                  ),
+                  const Spacer(),
+                  Text(
+                    distanceStr,
+                    style: const TextStyle(
+                      color: AppTheme.textWhite,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'About',
+                    style: TextStyle(
+                      color: AppTheme.textGray,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    bio,
+                    style: const TextStyle(
+                      color: AppTheme.textWhite,
+                      fontSize: 15,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryBlue,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _fitBounds() {
+    if (_mapController == null || _markers.isEmpty) return;
+
+    // We only auto-fit every time if we want strict following. 
+    // Usually, we might want to do it once or when participants change.
+    // However, the requirement is "auto zooms or adjusts ... as the locations change".
+    
+    double? minLat, maxLat, minLng, maxLng;
+
+    for (final marker in _markers) {
+      final lat = marker.position.latitude;
+      final lng = marker.position.longitude;
+
+      if (minLat == null || lat < minLat) minLat = lat;
+      if (maxLat == null || lat > maxLat) maxLat = lat;
+      if (minLng == null || lng < minLng) minLng = lng;
+      if (maxLng == null || lng > maxLng) maxLng = lng;
+    }
+
+    if (minLat != null && maxLat != null && minLng != null && maxLng != null) {
+      final bounds = LatLngBounds(
+        southwest: LatLng(minLat, minLng),
+        northeast: LatLng(maxLat, maxLng),
       );
-    });
+
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 70), // 70px padding
+      );
+    }
+  }
+
+  Future<void> _addSelfMarker() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (mounted) {
+        setState(() {
+          _markers.add(
+            Marker(
+              markerId: MarkerId(currentUserId),
+              position: LatLng(pos.latitude, pos.longitude),
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+              infoWindow: const InfoWindow(title: 'Me'),
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Error adding self marker: $e');
+    }
   }
 
   @override

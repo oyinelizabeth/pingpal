@@ -64,4 +64,9 @@ class LocalStorageService {
     }
     return null;
   }
+
+  static Future<void> clearAll() async {
+    final db = await database;
+    await db.delete('messages');
+  }
 }
