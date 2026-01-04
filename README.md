@@ -100,6 +100,25 @@ This separation prevents real-time data from overwhelming Firestore while ensuri
 Backend repository:  
 https://github.com/Idadelveloper/pingpal-backend
 
+## 👥 Contributors
+
+This project was developed collaboratively as part of a Mobile Cloud Computing Proof of Concept.
+- **Oyin** – Frontend Developer and Google Deployment
+    - Pingtrail core logic
+    - Flutter frontend
+    - Firebase integration
+    - Google Cloud deployment
+- **Ida** – Backend Developer
+    - Flutter UI implementation
+    - Node.js microservices
+    - Redis integration
+    - Adaptive TTL caching logic
+- **Sai** – Authentication Developer
+    - Firebase Authentication
+    - Push notifications
+    - Profile and Settings page
+
+---
 ---
 
 ## 🔒 Permissions Required
@@ -112,3 +131,4 @@ PingPal requires the following permissions:
 - Notifications – invites, arrivals, and friend requests
 
 ---
+

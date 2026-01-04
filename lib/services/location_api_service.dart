@@ -7,22 +7,26 @@ class LocationApiService {
 
   // Sends the user’s current location to the backend for caching and distribution
   static Future<void> sendLocation({
+    required String pingtrailId,
     required String userId,
     required double lat,
     required double lng,
     required String networkType,
   }) async {
+
     final url = Uri.parse('$baseUrl/update');
 
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
+        'pingtrailId': pingtrailId,
         'userId': userId,
         'latitude': lat,
         'longitude': lng,
         'networkType': networkType,
       }),
+
     );
 
     // Throws an error if the backend update fails

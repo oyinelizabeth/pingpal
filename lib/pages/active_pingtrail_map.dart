@@ -37,6 +37,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   bool _isArriving = false;
   bool _hasFittedCamera = false;
 
+  bool _hasNavigatedToSummary = false;
+
   String _currentUserName = 'A user';
 
   final Set<Polyline> _polylines = {};
@@ -90,7 +92,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
           final String uid = p['userId'];
           final String status = p['status'] ?? '';
 
-          if (uid == currentUserId || (status != 'accepted' && status != 'arrived')) continue;
+          if (uid == currentUserId) continue;
           if (_participantData.containsKey(uid)) continue;
 
           final userDoc = await FirebaseFirestore.instance
@@ -115,7 +117,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       if (mounted) _writerLoop();
     });
 
-    // 2. Reader Loop (Every 2 Seconds)
+    // Reader Loop (Every 2 Seconds)
     _readerTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted) _readerLoop(destination);
     });
@@ -123,7 +125,9 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   // Sends current location to backend with network context
   Future<void> _writerLoop() async {
-    try {
+      if (_hasArrived || _isArriving) return;
+
+      try {
       // Get GPS position
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
@@ -141,11 +145,13 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       }
 
       await LocationApiService.sendLocation(
+        pingtrailId: widget.pingtrailId,
         userId: currentUserId,
         lat: position.latitude,
         lng: position.longitude,
         networkType: networkType,
       );
+
 
       // Detects arrival based on distance threshold
       if (!_hasArrived && mounted) {
@@ -179,6 +185,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
                 .where((p) => p['status'] == 'accepted')
                 .map((p) => p['userId'].toString())
                 .toList();
+            setState(() => _hasArrived = true);
             _onArrivedPressed(memberIds);
           }
         }
@@ -190,7 +197,11 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   // Reads cached trail locations and updates markers
   Future<void> _readerLoop(LatLng destination) async {
+    if (_hasArrived) return;
+
     try {
+      _friendMarkers.clear();
+
       final List<dynamic> locations = await LocationApiService.getTrailLocations(widget.pingtrailId);
 
       for (var loc in locations) {
@@ -205,10 +216,10 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         final double lat = (loc['location']['lat'] as num).toDouble();
         final double lng = (loc['location']['lng'] as num).toDouble();
 
-        final userData = _participantData[uid];
-        final String name = userData?['fullName'] ?? 'Friend';
-        final String? photoUrl = userData?['photoUrl'];
-        
+        final userData = _participantData[uid] ?? {};
+        final String name = userData['fullName'] ?? 'Pingpal';
+        final String? photoUrl = userData['photoUrl'];
+
         String distanceText = '';
         double? distanceMeters;
         if (_lastSelfPosition != null) {
@@ -539,7 +550,21 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     if (arrivedMembers.contains(currentUserId)) {
       _hasArrived = true;
     }
+
+    if (_hasArrived && mounted && !_hasNavigatedToSummary) {
+      _hasNavigatedToSummary = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                PingtrailCompletePage(trailId: widget.pingtrailId),
+          ),
+        );
+      });
+    }
   }
+
 
   // Camera helpers
   Future<void> _moveToUserLocation() async {
@@ -584,7 +609,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
 
   // Arrival
   Future<void> _onArrivedPressed(List<String> members) async {
-    if (!mounted) return;
+    if (!mounted || _isArriving) return;
+
     setState(() => _isArriving = true);
 
     try {
@@ -594,23 +620,19 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         members: members,
       );
 
-      if (mounted) {
-        setState(() => _hasArrived = true);
+      _writerTimer?.cancel();
+      _readerTimer?.cancel();
+      LiveLocationService.stop();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Arrival confirmed 🎉')),
-        );
+      if (!mounted) return;
 
-        // Show summary for current user
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PingtrailCompletePage(trailId: widget.pingtrailId),
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Arrival confirmed 🎉')),
+      );
+
     } catch (_) {
       if (mounted) {
+        setState(() => _hasArrived = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to confirm arrival')),
         );
@@ -618,7 +640,20 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
     } finally {
       if (mounted) setState(() => _isArriving = false);
     }
+
+    if (!_hasNavigatedToSummary && mounted) {
+      _hasNavigatedToSummary = true;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              PingtrailCompletePage(trailId: widget.pingtrailId),
+        ),
+      );
+    }
+
   }
+
 
   // Hosts of a pingtrail can cancel for everyone
   Future<void> _cancelPingtrail(
