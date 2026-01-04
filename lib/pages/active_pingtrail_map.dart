@@ -90,7 +90,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
           final String uid = p['userId'];
           final String status = p['status'] ?? '';
 
-          if (uid == currentUserId || (status != 'accepted' && status != 'arrived')) continue;
+          if (uid == currentUserId) continue;
           if (_participantData.containsKey(uid)) continue;
 
           final userDoc = await FirebaseFirestore.instance
@@ -115,7 +115,7 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       if (mounted) _writerLoop();
     });
 
-    // 2. Reader Loop (Every 2 Seconds)
+    // Reader Loop (Every 2 Seconds)
     _readerTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted) _readerLoop(destination);
     });
@@ -141,11 +141,13 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
       }
 
       await LocationApiService.sendLocation(
+        pingtrailId: widget.pingtrailId,
         userId: currentUserId,
         lat: position.latitude,
         lng: position.longitude,
         networkType: networkType,
       );
+
 
       // Detects arrival based on distance threshold
       if (!_hasArrived && mounted) {
@@ -191,6 +193,8 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
   // Reads cached trail locations and updates markers
   Future<void> _readerLoop(LatLng destination) async {
     try {
+      _friendMarkers.clear();
+
       final List<dynamic> locations = await LocationApiService.getTrailLocations(widget.pingtrailId);
 
       for (var loc in locations) {
@@ -205,10 +209,10 @@ class _ActivePingtrailMapPageState extends State<ActivePingtrailMapPage> {
         final double lat = (loc['location']['lat'] as num).toDouble();
         final double lng = (loc['location']['lng'] as num).toDouble();
 
-        final userData = _participantData[uid];
-        final String name = userData?['fullName'] ?? 'Friend';
-        final String? photoUrl = userData?['photoUrl'];
-        
+        final userData = _participantData[uid] ?? {};
+        final String name = userData['fullName'] ?? 'Pingpal';
+        final String? photoUrl = userData['photoUrl'];
+
         String distanceText = '';
         double? distanceMeters;
         if (_lastSelfPosition != null) {
